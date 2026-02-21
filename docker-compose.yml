@@ -1,20 +1,20 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: bricksql_postgres
+    container_name: brinkql_postgres
     environment:
-      POSTGRES_DB: bricksql
-      POSTGRES_USER: bricksql
-      POSTGRES_PASSWORD: bricksql
+      POSTGRES_DB: brinkql
+      POSTGRES_USER: brinkql
+      POSTGRES_PASSWORD: brinkql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bricksql -d bricksql"]
+      test: ["CMD-SHELL", "pg_isready -U brinkql -d brinkql"]
       interval: 5s
       timeout: 5s
       retries: 10
     volumes:
-      - bricksql_pgdata:/var/lib/postgresql/data
+      - brinkql_pgdata:/var/lib/postgresql/data
 
 volumes:
-  bricksql_pgdata:
+  brinkql_pgdata:

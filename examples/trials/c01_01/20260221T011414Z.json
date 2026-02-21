@@ -1,0 +1,84 @@
+{
+  "case_id": "c01_01",
+  "category": "basic_select",
+  "question": "List the name and industry of all active companies.",
+  "case_notes": "Simplest possible query. Active is stored as INTEGER (1=true) in SQLite. The LLM must filter active=1 and include the TENANT param.",
+  "timestamp": "20260221T011414Z",
+  "target_db": "sqlite",
+  "ollama_model": "none",
+  "expected": {
+    "plan": {
+      "SELECT": [
+        {
+          "expr": {
+            "col": "companies.name"
+          }
+        },
+        {
+          "expr": {
+            "col": "companies.industry"
+          }
+        }
+      ],
+      "FROM": {
+        "table": "companies"
+      },
+      "WHERE": {
+        "AND": [
+          {
+            "EQ": [
+              {
+                "col": "companies.tenant_id"
+              },
+              {
+                "param": "TENANT"
+              }
+            ]
+          },
+          {
+            "EQ": [
+              {
+                "col": "companies.active"
+              },
+              {
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "LIMIT": {
+        "value": 10
+      }
+    },
+    "plan_raw": "{\n  \"SELECT\": [\n    {\n      \"expr\": {\n        \"col\": \"companies.name\"\n      }\n    },\n    {\n      \"expr\": {\n        \"col\": \"companies.industry\"\n      }\n    }\n  ],\n  \"FROM\": {\n    \"table\": \"companies\"\n  },\n  \"WHERE\": {\n    \"AND\": [\n      {\n        \"EQ\": [\n          {\n            \"col\": \"companies.tenant_id\"\n          },\n          {\n            \"param\": \"TENANT\"\n          }\n        ]\n      },\n      {\n        \"EQ\": [\n          {\n            \"col\": \"companies.active\"\n          },\n          {\n            \"value\": 1\n          }\n        ]\n      }\n    ]\n  },\n  \"LIMIT\": {\n    \"value\": 10\n  }\n}",
+    "sql": "SELECT \"companies\".\"name\", \"companies\".\"industry\"\nFROM \"companies\"\nWHERE (\"companies\".\"tenant_id\" = :TENANT) AND (\"companies\".\"active\" = :param_0)\nLIMIT 10",
+    "params": {
+      "param_0": 1,
+      "TENANT": "acme"
+    },
+    "rows": [
+      {
+        "name": "Acme Corp",
+        "industry": "Technology"
+      }
+    ],
+    "row_count": 1,
+    "error": null
+  },
+  "actual": {
+    "plan": null,
+    "plan_raw": "",
+    "sql": null,
+    "params": null,
+    "rows": null,
+    "row_count": null,
+    "error": "Ollama not available (--no-ollama)"
+  },
+  "comparison": {
+    "brinkql_valid": false,
+    "sql_match": false,
+    "rows_match": false,
+    "notes": "Ollama plan failed BrinkQL: Ollama not available (--no-ollama)"
+  }
+}

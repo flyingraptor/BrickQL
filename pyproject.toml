@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bricksql"
+name = "brinkql"
 version = "0.1.0"
 description = "Policy-driven, SQL-standard-aligned query orchestration framework for LLM planners."
 readme = "README.md"
@@ -26,9 +26,14 @@ dependencies = [
 
 [project.optional-dependencies]
 # psycopg (v3) is the modern PostgreSQL adapter; replaces psycopg2.
-# pip install "bricksql[postgres]" to add the optional Postgres driver.
+# pip install "brinkql[postgres]" to add the optional Postgres driver.
 postgres = [
     "psycopg[binary]>=3.3",
+]
+examples = [
+    # LangChain + Ollama integration for the examples/ runner
+    "langchain>=1.2.10",
+    "langchain-ollama>=1.0.1",
 ]
 dev = [
     # testing
@@ -40,15 +45,18 @@ dev = [
     # type checking
     "mypy>=1.19",
     "pydantic>=2.12",  # needed for mypy plugin
+    # examples runner
+    "langchain>=1.2.10",
+    "langchain-ollama>=1.0.1",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/your-org/bricksql"
-"Bug Tracker" = "https://github.com/your-org/bricksql/issues"
+"Homepage" = "https://github.com/flyingraptor/BrickQL"
+"Bug Tracker" = "https://github.com/flyingraptor/BrickQL/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bricksql*"]
+include = ["brinkql*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -87,7 +95,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["bricksql"]
+known-first-party = ["brinkql"]
 
 [tool.ruff.format]
 quote-style = "double"

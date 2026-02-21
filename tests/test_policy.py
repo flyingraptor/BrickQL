@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from bricksql.errors import DisallowedColumnError, DisallowedTableError, MissingParamError
-from bricksql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
-from bricksql.schema.dialect import DialectProfile
-from bricksql.schema.query_plan import (
+from brinkql.errors import DisallowedColumnError, DisallowedTableError, MissingParamError
+from brinkql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
+from brinkql.schema.dialect import DialectProfile
+from brinkql.schema.query_plan import (
     FromClause,
     LimitClause,
     QueryPlan,

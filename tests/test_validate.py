@@ -3,15 +3,15 @@ from __future__ import annotations
 
 import pytest
 
-from bricksql.errors import (
+from brinkql.errors import (
     DialectViolationError,
     InvalidJoinRelError,
     ProfileConfigError,
     SchemaError,
     ValidationError,
 )
-from bricksql.schema.dialect import DialectProfile
-from bricksql.schema.query_plan import (
+from brinkql.schema.dialect import DialectProfile
+from brinkql.schema.query_plan import (
     CTEClause,
     FromClause,
     JoinClause,
@@ -22,7 +22,7 @@ from bricksql.schema.query_plan import (
     SetOpClause,
     WindowSpec,
 )
-from bricksql.validate.validator import PlanValidator
+from brinkql.validate.validator import PlanValidator
 from tests.fixtures import load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()

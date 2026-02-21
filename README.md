@@ -1,10 +1,10 @@
-# BrickSQL
+# BrinkQL
 
 **Policy-driven, SQL-standard-aligned query orchestration for LLM planners.**
 
 > Build Queries. Don't Generate Them.
 
-BrickSQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JSON)**; BrickSQL validates it against your schema, enforces policy rules, and compiles it to safe, parameterized SQL. Raw SQL never touches the LLM.
+BrinkQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JSON)**; BrinkQL validates it against your schema, enforces policy rules, and compiles it to safe, parameterized SQL. Raw SQL never touches the LLM.
 
 ---
 
@@ -17,7 +17,7 @@ User question
   LLM Planner  ──►  QueryPlan JSON
                           │
                     ┌─────▼──────┐
-                    │ BrickSQL   │
+                    │ BrinkQL   │
                     │            │
                     │  1. Parse  │  Pydantic model validation
                     │  2. Validate│  Schema + dialect rules
@@ -38,10 +38,10 @@ User question
 
 ```bash
 # Core library (SQLite only)
-pip install bricksql
+pip install brinkql
 
 # With PostgreSQL driver (psycopg v3)
-pip install "bricksql[postgres]"
+pip install "brinkql[postgres]"
 ```
 
 Requires Python ≥ 3.10.
@@ -51,8 +51,8 @@ Requires Python ≥ 3.10.
 ## Quick start
 
 ```python
-import bricksql
-from bricksql import SchemaSnapshot, DialectProfile, PolicyConfig, TablePolicy
+import brinkql
+from brinkql import SchemaSnapshot, DialectProfile, PolicyConfig, TablePolicy
 
 # 1. Load your schema snapshot (describes tables, columns, relationships)
 import json
@@ -79,9 +79,9 @@ policy = PolicyConfig(
 # 4. Compile the LLM's QueryPlan JSON
 plan_json = llm_response  # {"SELECT": [...], "FROM": {...}, "JOIN": [...], ...}
 
-compiled = bricksql.validate_and_compile(plan_json, snapshot, dialect, policy)
+compiled = brinkql.validate_and_compile(plan_json, snapshot, dialect, policy)
 
-# 5. Execute with your own connection — BrickSQL does not execute queries
+# 5. Execute with your own connection — BrinkQL does not execute queries
 cursor.execute(compiled.sql, compiled.merge_runtime_params({"TENANT": tenant_id}))
 ```
 
@@ -186,7 +186,7 @@ profile = (
 per-table rules — each table can have its own param-bound columns and denied columns.
 
 ```python
-from bricksql import PolicyConfig, TablePolicy
+from brinkql import PolicyConfig, TablePolicy
 
 policy = PolicyConfig(
     inject_missing_params=True,
@@ -229,7 +229,7 @@ cursor.execute(compiled.sql, sql_params)
 ## Prompting the LLM
 
 ```python
-components = bricksql.get_prompt_components(
+components = brinkql.get_prompt_components(
     snapshot=snapshot,
     dialect=dialect,
     question="List the top 5 highest-paid employees in Engineering",
@@ -244,13 +244,13 @@ response = llm.chat(system=components.system_prompt, user=components.user_prompt
 
 ## Error handling
 
-All errors are subclasses of `BrickSQLError` and carry a machine-readable `code` and `details` dict — designed for LLM repair loops.
+All errors are subclasses of `BrinkQLError` and carry a machine-readable `code` and `details` dict — designed for LLM repair loops.
 
 ```python
-from bricksql import ParseError, ValidationError, CompilationError
+from brinkql import ParseError, ValidationError, CompilationError
 
 try:
-    compiled = bricksql.validate_and_compile(plan_json, snapshot, dialect, policy)
+    compiled = brinkql.validate_and_compile(plan_json, snapshot, dialect, policy)
 except ParseError as e:
     # Malformed JSON or invalid QueryPlan structure
     pass
@@ -293,13 +293,13 @@ make test-integration-postgres
 ## Repository layout
 
 ```
-bricksql/
+brinkql/
   schema/           # QueryPlan, SchemaSnapshot, DialectProfile, expression constants
   validate/         # PlanValidator — structural, semantic, dialect checks
   policy/           # PolicyEngine, PolicyConfig — param injection and limits
   compile/          # QueryBuilder, PostgresCompiler, SQLiteCompiler → parameterized SQL
   prompt/           # PromptBuilder → system + user prompts for the LLM
-  errors.py         # Exception hierarchy (BrickSQLError and subclasses)
+  errors.py         # Exception hierarchy (BrinkQLError and subclasses)
 tests/
   fixtures/         # schema.json, ddl_sqlite.sql, ddl_postgres.sql
   integration/      # SQLite (in-memory) and PostgreSQL (Docker) integration tests

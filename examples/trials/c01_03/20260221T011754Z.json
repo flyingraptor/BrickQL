@@ -1,0 +1,136 @@
+{
+  "case_id": "c01_03",
+  "category": "basic_select",
+  "question": "Which employees have no department assigned?",
+  "case_notes": "IS_NULL predicate on a nullable foreign-key column. Henry (id=8) has no department in the seed data.",
+  "timestamp": "20260221T011754Z",
+  "target_db": "sqlite",
+  "ollama_model": "gpt-oss:latest",
+  "expected": {
+    "plan": {
+      "SELECT": [
+        {
+          "expr": {
+            "col": "employees.employee_id"
+          },
+          "alias": "id"
+        },
+        {
+          "expr": {
+            "col": "employees.first_name"
+          }
+        },
+        {
+          "expr": {
+            "col": "employees.last_name"
+          }
+        }
+      ],
+      "FROM": {
+        "table": "employees"
+      },
+      "WHERE": {
+        "AND": [
+          {
+            "EQ": [
+              {
+                "col": "employees.tenant_id"
+              },
+              {
+                "param": "TENANT"
+              }
+            ]
+          },
+          {
+            "IS_NULL": {
+              "col": "employees.department_id"
+            }
+          }
+        ]
+      },
+      "LIMIT": {
+        "value": 20
+      }
+    },
+    "plan_raw": "{\n  \"SELECT\": [\n    {\n      \"expr\": {\n        \"col\": \"employees.employee_id\"\n      },\n      \"alias\": \"id\"\n    },\n    {\n      \"expr\": {\n        \"col\": \"employees.first_name\"\n      }\n    },\n    {\n      \"expr\": {\n        \"col\": \"employees.last_name\"\n      }\n    }\n  ],\n  \"FROM\": {\n    \"table\": \"employees\"\n  },\n  \"WHERE\": {\n    \"AND\": [\n      {\n        \"EQ\": [\n          {\n            \"col\": \"employees.tenant_id\"\n          },\n          {\n            \"param\": \"TENANT\"\n          }\n        ]\n      },\n      {\n        \"IS_NULL\": {\n          \"col\": \"employees.department_id\"\n        }\n      }\n    ]\n  },\n  \"LIMIT\": {\n    \"value\": 20\n  }\n}",
+    "sql": "SELECT \"employees\".\"employee_id\" AS \"id\", \"employees\".\"first_name\", \"employees\".\"last_name\"\nFROM \"employees\"\nWHERE (\"employees\".\"tenant_id\" = :TENANT) AND (\"employees\".\"department_id\" IS NULL)\nLIMIT 20",
+    "params": {
+      "TENANT": "acme"
+    },
+    "rows": [
+      {
+        "id": 8,
+        "first_name": "Henry",
+        "last_name": "Wilson"
+      }
+    ],
+    "row_count": 1,
+    "error": null
+  },
+  "actual": {
+    "plan": {
+      "SELECT": [
+        {
+          "expr": {
+            "col": "employees.employee_id"
+          }
+        },
+        {
+          "expr": {
+            "col": "employees.first_name"
+          }
+        },
+        {
+          "expr": {
+            "col": "employees.last_name"
+          }
+        }
+      ],
+      "FROM": {
+        "table": "employees"
+      },
+      "WHERE": {
+        "AND": [
+          {
+            "EQ": [
+              {
+                "col": "employees.tenant_id"
+              },
+              {
+                "param": "TENANT"
+              }
+            ]
+          },
+          {
+            "IS_NULL": {
+              "col": "employees.department_id"
+            }
+          }
+        ]
+      },
+      "LIMIT": {
+        "value": 100
+      }
+    },
+    "plan_raw": "{\n  \"SELECT\": [\n    {\"expr\": {\"col\": \"employees.employee_id\"}},\n    {\"expr\": {\"col\": \"employees.first_name\"}},\n    {\"expr\": {\"col\": \"employees.last_name\"}}\n  ],\n  \"FROM\": {\"table\": \"employees\"},\n  \"WHERE\": {\n    \"AND\": [\n      {\"EQ\": [{\"col\": \"employees.tenant_id\"}, {\"param\": \"TENANT\"}]},\n      {\"IS_NULL\": {\"col\": \"employees.department_id\"}}\n    ]\n  },\n  \"LIMIT\": {\"value\": 100}\n}",
+    "sql": "SELECT \"employees\".\"employee_id\", \"employees\".\"first_name\", \"employees\".\"last_name\"\nFROM \"employees\"\nWHERE (\"employees\".\"tenant_id\" = :TENANT) AND (\"employees\".\"department_id\" IS NULL)\nLIMIT 100",
+    "params": {
+      "TENANT": "acme"
+    },
+    "rows": [
+      {
+        "employee_id": 8,
+        "first_name": "Henry",
+        "last_name": "Wilson"
+      }
+    ],
+    "row_count": 1,
+    "error": null
+  },
+  "comparison": {
+    "brinkql_valid": true,
+    "sql_match": false,
+    "rows_match": false,
+    "notes": "SQL differs from expected; Row counts: expected=1 actual=1"
+  }
+}

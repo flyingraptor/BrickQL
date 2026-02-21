@@ -1,10 +1,10 @@
 """Unit tests for QueryBuilder (both dialects)."""
 from __future__ import annotations
 
-from bricksql.compile.builder import QueryBuilder
-from bricksql.compile.postgres import PostgresCompiler
-from bricksql.compile.sqlite import SQLiteCompiler
-from bricksql.schema.query_plan import (
+from brinkql.compile.builder import QueryBuilder
+from brinkql.compile.postgres import PostgresCompiler
+from brinkql.compile.sqlite import SQLiteCompiler
+from brinkql.schema.query_plan import (
     FromClause,
     JoinClause,
     LimitClause,

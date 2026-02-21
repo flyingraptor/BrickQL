@@ -1,0 +1,161 @@
+{
+  "case_id": "c01_02",
+  "category": "basic_select",
+  "question": "Show the email address and employment type of all employees.",
+  "case_notes": "No filtering beyond TENANT isolation. Tests that the LLM selects exactly two specific columns from employees.",
+  "timestamp": "20260221T011645Z",
+  "target_db": "sqlite",
+  "ollama_model": "gpt-oss:latest",
+  "expected": {
+    "plan": {
+      "SELECT": [
+        {
+          "expr": {
+            "col": "employees.email"
+          }
+        },
+        {
+          "expr": {
+            "col": "employees.employment_type"
+          }
+        }
+      ],
+      "FROM": {
+        "table": "employees"
+      },
+      "WHERE": {
+        "EQ": [
+          {
+            "col": "employees.tenant_id"
+          },
+          {
+            "param": "TENANT"
+          }
+        ]
+      },
+      "LIMIT": {
+        "value": 50
+      }
+    },
+    "plan_raw": "{\n  \"SELECT\": [\n    {\n      \"expr\": {\n        \"col\": \"employees.email\"\n      }\n    },\n    {\n      \"expr\": {\n        \"col\": \"employees.employment_type\"\n      }\n    }\n  ],\n  \"FROM\": {\n    \"table\": \"employees\"\n  },\n  \"WHERE\": {\n    \"EQ\": [\n      {\n        \"col\": \"employees.tenant_id\"\n      },\n      {\n        \"param\": \"TENANT\"\n      }\n    ]\n  },\n  \"LIMIT\": {\n    \"value\": 50\n  }\n}",
+    "sql": "SELECT \"employees\".\"email\", \"employees\".\"employment_type\"\nFROM \"employees\"\nWHERE \"employees\".\"tenant_id\" = :TENANT\nLIMIT 50",
+    "params": {
+      "TENANT": "acme"
+    },
+    "rows": [
+      {
+        "email": "alice.smith@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "bob.johnson@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "carol.white@acme.com",
+        "employment_type": "contractor"
+      },
+      {
+        "email": "dave.brown@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "eve.davis@acme.com",
+        "employment_type": "part_time"
+      },
+      {
+        "email": "frank.miller@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "grace.lee@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "henry.wilson@acme.com",
+        "employment_type": "contractor"
+      }
+    ],
+    "row_count": 8,
+    "error": null
+  },
+  "actual": {
+    "plan": {
+      "SELECT": [
+        {
+          "expr": {
+            "col": "employees.email"
+          }
+        },
+        {
+          "expr": {
+            "col": "employees.employment_type"
+          }
+        }
+      ],
+      "FROM": {
+        "table": "employees"
+      },
+      "WHERE": {
+        "EQ": [
+          {
+            "col": "employees.tenant_id"
+          },
+          {
+            "param": "TENANT"
+          }
+        ]
+      },
+      "LIMIT": {
+        "value": 100
+      }
+    },
+    "plan_raw": "{\n  \"SELECT\": [\n    {\"expr\": {\"col\": \"employees.email\"}},\n    {\"expr\": {\"col\": \"employees.employment_type\"}}\n  ],\n  \"FROM\": {\"table\": \"employees\"},\n  \"WHERE\": {\n    \"EQ\": [\n      {\"col\": \"employees.tenant_id\"},\n      {\"param\": \"TENANT\"}\n    ]\n  },\n  \"LIMIT\": {\"value\": 100}\n}",
+    "sql": "SELECT \"employees\".\"email\", \"employees\".\"employment_type\"\nFROM \"employees\"\nWHERE \"employees\".\"tenant_id\" = :TENANT\nLIMIT 100",
+    "params": {
+      "TENANT": "acme"
+    },
+    "rows": [
+      {
+        "email": "alice.smith@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "bob.johnson@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "carol.white@acme.com",
+        "employment_type": "contractor"
+      },
+      {
+        "email": "dave.brown@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "eve.davis@acme.com",
+        "employment_type": "part_time"
+      },
+      {
+        "email": "frank.miller@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "grace.lee@acme.com",
+        "employment_type": "full_time"
+      },
+      {
+        "email": "henry.wilson@acme.com",
+        "employment_type": "contractor"
+      }
+    ],
+    "row_count": 8,
+    "error": null
+  },
+  "comparison": {
+    "brinkql_valid": true,
+    "sql_match": false,
+    "rows_match": true,
+    "notes": "SQL differs from expected"
+  }
+}

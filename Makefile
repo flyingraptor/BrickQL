@@ -1,4 +1,4 @@
-# BrickSQL – development task runner
+# BrinkQL – development task runner
 # Usage: make <target>   (assumes .venv is active or use `make venv` first)
 
 VENV     := .venv
@@ -8,7 +8,7 @@ PYTEST   := $(VENV)/bin/pytest
 RUFF     := $(VENV)/bin/ruff
 MYPY     := $(VENV)/bin/mypy
 
-.PHONY: help venv install lint fmt typecheck test test-unit test-integration clean
+.PHONY: help venv install lint fmt typecheck test test-unit test-integration clean docker-postgres-clean
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -22,14 +22,14 @@ install: venv  ## Install the package + all dev dependencies
 	$(PIP) install -e ".[dev]"
 
 lint:  ## Run ruff linter
-	$(RUFF) check bricksql/ tests/
+	$(RUFF) check brinkql/ tests/
 
 fmt:  ## Auto-format with ruff
-	$(RUFF) format bricksql/ tests/
-	$(RUFF) check --fix bricksql/ tests/
+	$(RUFF) format brinkql/ tests/
+	$(RUFF) check --fix brinkql/ tests/
 
 typecheck:  ## Run mypy static type checker
-	$(MYPY) bricksql/
+	$(MYPY) brinkql/
 
 test-unit:  ## Run unit tests (no DB required)
 	$(PYTEST) tests/ -m "not integration and not postgres" -v
@@ -37,12 +37,18 @@ test-unit:  ## Run unit tests (no DB required)
 test-integration-sqlite:  ## Run SQLite integration tests (in-memory, no Docker)
 	$(PYTEST) tests/integration/test_sqlite.py -v -m integration
 
+docker-postgres-clean:  ## Remove Postgres container and volume (use if docker-compose fails with 'ContainerConfig')
+	-docker-compose rm -sf postgres 2>/dev/null || true
+	-docker rm -f bricksql_postgres 2>/dev/null || true
+	-docker volume rm bricksql_pgdata 2>/dev/null || true
+	@echo "Postgres container and volume removed. Run 'make test-integration-postgres' to start fresh."
+
 test-integration-postgres:  ## Run PostgreSQL integration tests (requires Docker Compose)
 	@echo "Starting Postgres via Docker Compose..."
 	docker-compose up -d postgres
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 5
-	BRICKSQL_PG_DSN="host=localhost port=5432 dbname=bricksql user=bricksql password=bricksql" \
+	BRINKQL_PG_DSN="host=localhost port=5432 dbname=brinkql user=brinkql password=brinkql" \
 		$(PYTEST) tests/integration/test_postgres.py -v -m postgres
 
 test:  ## Run all tests except Postgres integration
