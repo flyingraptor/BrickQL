@@ -1,4 +1,8 @@
-# BrinkQL
+<p align="center">
+  <img src="logo.svg" alt="BrinkQL" width="220" />
+</p>
+
+# Description
 
 **Policy-driven, SQL-standard-aligned query orchestration for LLM planners.**
 
