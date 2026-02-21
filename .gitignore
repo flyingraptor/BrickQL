@@ -50,3 +50,5 @@ brinkql_pgdata/
 # Example trial outputs
 examples/trials/*
 !examples/trials/.gitkeep
+
+examples/
