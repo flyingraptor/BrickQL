@@ -46,3 +46,7 @@ brinkql_pgdata/
 # Environment variable files
 .env
 .env.*
+
+# Example trial outputs
+examples/trials/*
+!examples/trials/.gitkeep
