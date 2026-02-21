@@ -1,0 +1,195 @@
+{
+  "tables": [
+    {
+      "name": "companies",
+      "columns": [
+        {"name": "company_id",   "type": "INTEGER", "nullable": false},
+        {"name": "tenant_id",    "type": "TEXT",    "nullable": false},
+        {"name": "name",         "type": "TEXT",    "nullable": false},
+        {"name": "industry",     "type": "TEXT",    "nullable": true},
+        {"name": "founded_year", "type": "INTEGER", "nullable": true},
+        {"name": "active",       "type": "BOOLEAN", "nullable": false},
+        {"name": "metadata",     "type": "JSON",    "nullable": true},
+        {"name": "created_at",   "type": "TIMESTAMP","nullable": false}
+      ],
+      "relationships": ["companies__departments", "companies__employees", "companies__projects"]
+    },
+    {
+      "name": "departments",
+      "columns": [
+        {"name": "department_id", "type": "INTEGER", "nullable": false},
+        {"name": "tenant_id",     "type": "TEXT",    "nullable": false},
+        {"name": "company_id",    "type": "INTEGER", "nullable": false},
+        {"name": "name",          "type": "TEXT",    "nullable": false},
+        {"name": "code",          "type": "TEXT",    "nullable": false},
+        {"name": "budget",        "type": "REAL",    "nullable": true},
+        {"name": "headcount",     "type": "INTEGER", "nullable": false}
+      ],
+      "relationships": ["companies__departments", "departments__employees"]
+    },
+    {
+      "name": "employees",
+      "columns": [
+        {"name": "employee_id",     "type": "INTEGER", "nullable": false},
+        {"name": "tenant_id",       "type": "TEXT",    "nullable": false},
+        {"name": "company_id",      "type": "INTEGER", "nullable": false},
+        {"name": "department_id",   "type": "INTEGER", "nullable": true},
+        {"name": "first_name",      "type": "TEXT",    "nullable": false},
+        {"name": "last_name",       "type": "TEXT",    "nullable": false},
+        {"name": "middle_name",     "type": "TEXT",    "nullable": true},
+        {"name": "email",           "type": "TEXT",    "nullable": false},
+        {"name": "phone",           "type": "TEXT",    "nullable": true},
+        {"name": "employment_type", "type": "TEXT",    "nullable": false},
+        {"name": "salary",          "type": "REAL",    "nullable": true},
+        {"name": "hire_date",       "type": "DATE",    "nullable": false},
+        {"name": "birth_date",      "type": "DATE",    "nullable": true},
+        {"name": "active",          "type": "BOOLEAN", "nullable": false},
+        {"name": "remote",          "type": "BOOLEAN", "nullable": false},
+        {"name": "manager_id",      "type": "INTEGER", "nullable": true},
+        {"name": "notes",           "type": "TEXT",    "nullable": true}
+      ],
+      "relationships": [
+        "companies__employees",
+        "departments__employees",
+        "employees__manager",
+        "employees__employee_skills",
+        "employees__project_assignments",
+        "employees__salary_history"
+      ]
+    },
+    {
+      "name": "skills",
+      "columns": [
+        {"name": "skill_id",  "type": "INTEGER", "nullable": false},
+        {"name": "name",      "type": "TEXT",    "nullable": false},
+        {"name": "category",  "type": "TEXT",    "nullable": false}
+      ],
+      "relationships": ["employee_skills__skills"]
+    },
+    {
+      "name": "employee_skills",
+      "columns": [
+        {"name": "employee_id", "type": "INTEGER", "nullable": false},
+        {"name": "skill_id",    "type": "INTEGER", "nullable": false},
+        {"name": "proficiency", "type": "INTEGER", "nullable": false}
+      ],
+      "relationships": [
+        "employees__employee_skills",
+        "employee_skills__skills"
+      ]
+    },
+    {
+      "name": "projects",
+      "columns": [
+        {"name": "project_id", "type": "INTEGER", "nullable": false},
+        {"name": "tenant_id",  "type": "TEXT",    "nullable": false},
+        {"name": "company_id", "type": "INTEGER", "nullable": false},
+        {"name": "name",       "type": "TEXT",    "nullable": false},
+        {"name": "status",     "type": "TEXT",    "nullable": false},
+        {"name": "budget",     "type": "REAL",    "nullable": true},
+        {"name": "start_date", "type": "DATE",    "nullable": true},
+        {"name": "end_date",   "type": "DATE",    "nullable": true}
+      ],
+      "relationships": [
+        "companies__projects",
+        "projects__project_assignments"
+      ]
+    },
+    {
+      "name": "project_assignments",
+      "columns": [
+        {"name": "project_id",     "type": "INTEGER", "nullable": false},
+        {"name": "employee_id",    "type": "INTEGER", "nullable": false},
+        {"name": "role",           "type": "TEXT",    "nullable": true},
+        {"name": "hours_per_week", "type": "REAL",    "nullable": true}
+      ],
+      "relationships": [
+        "projects__project_assignments",
+        "employees__project_assignments"
+      ]
+    },
+    {
+      "name": "salary_history",
+      "columns": [
+        {"name": "history_id",     "type": "INTEGER", "nullable": false},
+        {"name": "employee_id",    "type": "INTEGER", "nullable": false},
+        {"name": "salary",         "type": "REAL",    "nullable": false},
+        {"name": "effective_date", "type": "DATE",    "nullable": false},
+        {"name": "reason",         "type": "TEXT",    "nullable": true}
+      ],
+      "relationships": ["employees__salary_history"]
+    }
+  ],
+  "relationships": [
+    {
+      "key": "companies__departments",
+      "from_table": "departments",
+      "from_col": "company_id",
+      "to_table": "companies",
+      "to_col": "company_id"
+    },
+    {
+      "key": "companies__employees",
+      "from_table": "employees",
+      "from_col": "company_id",
+      "to_table": "companies",
+      "to_col": "company_id"
+    },
+    {
+      "key": "departments__employees",
+      "from_table": "employees",
+      "from_col": "department_id",
+      "to_table": "departments",
+      "to_col": "department_id"
+    },
+    {
+      "key": "employees__manager",
+      "from_table": "employees",
+      "from_col": "manager_id",
+      "to_table": "employees",
+      "to_col": "employee_id"
+    },
+    {
+      "key": "employees__employee_skills",
+      "from_table": "employee_skills",
+      "from_col": "employee_id",
+      "to_table": "employees",
+      "to_col": "employee_id"
+    },
+    {
+      "key": "employee_skills__skills",
+      "from_table": "employee_skills",
+      "from_col": "skill_id",
+      "to_table": "skills",
+      "to_col": "skill_id"
+    },
+    {
+      "key": "companies__projects",
+      "from_table": "projects",
+      "from_col": "company_id",
+      "to_table": "companies",
+      "to_col": "company_id"
+    },
+    {
+      "key": "projects__project_assignments",
+      "from_table": "project_assignments",
+      "from_col": "project_id",
+      "to_table": "projects",
+      "to_col": "project_id"
+    },
+    {
+      "key": "employees__project_assignments",
+      "from_table": "project_assignments",
+      "from_col": "employee_id",
+      "to_table": "employees",
+      "to_col": "employee_id"
+    },
+    {
+      "key": "employees__salary_history",
+      "from_table": "salary_history",
+      "from_col": "employee_id",
+      "to_table": "employees",
+      "to_col": "employee_id"
+    }
+  ]
+}
