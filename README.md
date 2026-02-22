@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="BrinkQL" width="220" />
+  <img src="logo.svg" alt="BrinkQL" width="420" />
 </p>
 
 # Description
@@ -286,6 +286,19 @@ brinkql/
   compile/          # QueryBuilder, PostgresCompiler, SQLiteCompiler → parameterized SQL
   prompt/           # PromptBuilder → system + user prompts for the LLM
   errors.py         # Exception hierarchy (BrinkQLError and subclasses)
+examples/
+  cases/            # Named test cases (c01–c10) covering SQL feature categories
+  trials/           # Runtime trial outputs — gitignored, generated locally
+  runner.py         # CLI: run cases against SQLite/Postgres with optional Ollama
+  _case.py          # Case dataclass definition
+  _ollama.py        # Thin Ollama client (langchain-ollama)
+  _seed.py          # In-memory SQLite seeder
+  _setup.py         # Shared schema snapshot, dialect, and policy helpers
+  _trial.py         # TrialResult serialisation
+  README.md         # Examples usage guide
+docs/
+  how-it-works.mmd  # Mermaid source for the architecture diagram
+  how-it-works.png  # Rendered architecture diagram (used in README)
 tests/
   fixtures/         # schema.json, ddl_sqlite.sql, ddl_postgres.sql
   integration/      # SQLite (in-memory) and PostgreSQL (Docker) integration tests
