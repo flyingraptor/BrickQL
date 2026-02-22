@@ -92,6 +92,22 @@ The only output the LLM must produce. A structured, SQL-grammar-aligned JSON obj
 }
 ```
 
+Each expression field (`expr`, `GROUP_BY` items, `ORDER_BY` items, window `partition_by`) is parsed into a **typed operand** automatically by Pydantic:
+
+| JSON shape | Python type |
+|---|---|
+| `{"col": "t.col"}` | `ColumnOperand(col="t.col")` |
+| `{"value": 42}` | `ValueOperand(value=42)` |
+| `{"param": "TENANT"}` | `ParamOperand(param="TENANT")` |
+| `{"func": "COUNT", "args": [...]}` | `FuncOperand(func="COUNT", args=[...])` |
+| `{"case": {"when": [...], "else": ...}}` | `CaseOperand(case=CaseBody(...))` |
+
+These types are importable if you need to inspect or construct plans programmatically:
+
+```python
+from brickql import ColumnOperand, ValueOperand, ParamOperand, FuncOperand, CaseOperand, Operand
+```
+
 ### SchemaSnapshot
 
 Describes your database structure: tables, columns (name, type, nullability), and named relationships. It is purely structural — no policy or access-control concerns. Loaded once at startup and shared across requests.
@@ -249,6 +265,50 @@ except CompilationError as e:
 
 ---
 
+## Extensibility
+
+### Adding a new dialect
+
+Register a custom `SQLCompiler` subclass once; `validate_and_compile` picks it up automatically for any `DialectProfile` with that target:
+
+```python
+from brickql.compile.base import SQLCompiler
+from brickql.compile.registry import CompilerFactory
+
+@CompilerFactory.register("mysql")
+class MySQLCompiler(SQLCompiler):
+    @property
+    def dialect_name(self) -> str:
+        return "mysql"
+
+    def param_placeholder(self, name: str) -> str:
+        return f"%({name})s"
+
+    def like_operator(self, op: str) -> str:
+        return op
+
+    def quote_identifier(self, name: str) -> str:
+        return f"`{name}`"
+
+# Now you can use target="mysql" in DialectProfile.builder(...)
+```
+
+### Adding a new operator
+
+Register a rendering handler; `OperatorRegistry` wires it in without touching the built-in `PredicateBuilder`:
+
+```python
+from brickql.compile.registry import OperatorRegistry
+
+@OperatorRegistry.register("REGEXP")
+def _regexp_handler(op, args, build_operand):
+    left  = build_operand(args[0])
+    right = build_operand(args[1])
+    return f"{left} REGEXP {right}"
+```
+
+---
+
 ## Development
 
 ```bash
@@ -280,31 +340,57 @@ make test-integration-postgres
 
 ```
 brickql/
-  schema/           # QueryPlan, SchemaSnapshot, DialectProfile, expression constants
-  validate/         # PlanValidator — structural, semantic, dialect checks
-  policy/           # PolicyEngine, PolicyConfig — param injection and limits
-  compile/          # QueryBuilder, PostgresCompiler, SQLiteCompiler → parameterized SQL
-  prompt/           # PromptBuilder → system + user prompts for the LLM
-  errors.py         # Exception hierarchy (brickQLError and subclasses)
+  schema/
+    expressions.py        # Operator/operand enums and frozenset constants
+    operands.py           # Typed operand models (ColumnOperand, ValueOperand, …) + Operand union
+    query_plan.py         # QueryPlan Pydantic model + domain methods (collect_col_refs, …)
+    snapshot.py           # SchemaSnapshot, TableInfo, ColumnInfo, RelationshipInfo
+    dialect.py            # DialectProfile + DialectProfileBuilder (fluent API)
+    column_reference.py   # ColumnReference — parse + validate table.column strings
+    context.py            # ValidationContext value object (snapshot + dialect)
+  validate/
+    validator.py          # PlanValidator — orchestrates all sub-validators
+    dialect_validator.py  # Feature-flag checks (CTE, subquery, join depth, window)
+    schema_validator.py   # Table / column existence, JOIN relationship keys
+    semantic_validator.py # HAVING/GROUP_BY pairing, LIMIT range
+    operand_validator.py  # OperandValidator + PredicateValidator (mutually recursive)
+  policy/
+    engine.py             # PolicyEngine, PolicyConfig, TablePolicy
+  compile/
+    base.py               # SQLCompiler ABC + CompiledSQL dataclass
+    registry.py           # CompilerFactory + OperatorRegistry (OCP extension points)
+    context.py            # CompilationContext value object (compiler + snapshot)
+    expression_builder.py # RuntimeContext + OperandBuilder + PredicateBuilder
+    clause_builders.py    # SelectClause / From / Join / Window / CTE / SetOp builders
+    builder.py            # QueryBuilder — orchestrates all sub-builders
+    postgres.py           # PostgresCompiler  (%(name)s placeholders, ILIKE)
+    sqlite.py             # SQLiteCompiler    (:name placeholders, LIKE fallback)
+  prompt/
+    builder.py            # PromptBuilder + PromptComponents
+  errors.py               # Exception hierarchy (brickQLError and subclasses)
 examples/
-  cases/            # Named test cases (c01–c10) covering SQL feature categories
-  trials/           # Runtime trial outputs — gitignored, generated locally
-  runner.py         # CLI: run cases against SQLite/Postgres with optional Ollama
-  _case.py          # Case dataclass definition
-  _ollama.py        # Thin Ollama client (langchain-ollama)
-  _seed.py          # In-memory SQLite seeder
-  _setup.py         # Shared schema snapshot, dialect, and policy helpers
-  _trial.py         # TrialResult serialisation
-  README.md         # Examples usage guide
+  cases/                  # Named test cases (c01–c10) covering SQL feature categories
+  trials/                 # Runtime trial outputs — gitignored, generated locally
+  runner.py               # CLI: run cases against SQLite/Postgres with optional Ollama
+  _case.py                # Case dataclass definition
+  _ollama.py              # Thin Ollama client (langchain-ollama)
+  _seed.py                # In-memory SQLite seeder
+  _setup.py               # Shared schema snapshot, dialect, and policy helpers
+  _trial.py               # TrialResult serialisation
+  README.md               # Examples usage guide
 docs/
-  how-it-works.mmd  # Mermaid source for the architecture diagram
-  how-it-works.png  # Rendered architecture diagram (used in README)
+  how-it-works.mmd        # Simple end-to-end flow (Mermaid)
+  how-it-works.png        # Rendered architecture diagram (used in README)
+  how-it-works.excalidraw # Visual flow diagram (Excalidraw)
+  flow-diagram.mmd        # Detailed processing flow with sub-component breakdown (Mermaid)
+  class-diagram.mmd       # Full class relations (Mermaid)
+  code-walkthrough.md     # Per-file explanations with full call-sequence trace
 tests/
-  fixtures/         # schema.json, ddl_sqlite.sql, ddl_postgres.sql
-  integration/      # SQLite (in-memory) and PostgreSQL (Docker) integration tests
-docker-compose.yml  # PostgreSQL service for integration tests
-pyproject.toml      # Package metadata, dependencies, ruff, mypy config
-Makefile            # Development task runner
+  fixtures/               # schema.json, ddl_sqlite.sql, ddl_postgres.sql
+  integration/            # SQLite (in-memory) and PostgreSQL (Docker) integration tests
+docker-compose.yml        # PostgreSQL service for integration tests
+pyproject.toml            # Package metadata, dependencies, ruff, mypy config
+Makefile                  # Development task runner
 ```
 
 ---

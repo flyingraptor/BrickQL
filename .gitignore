@@ -53,5 +53,9 @@ examples/
 docs/class-diagram.mmd
 docs/flow-diagram.mmd
 
+# Generated documentation
+docs/code-walkthrough.md
+docs/examples.md
+
 # Local refactoring notes
 todo/
