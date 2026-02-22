@@ -64,6 +64,7 @@ from brickql.schema.operands import (
     ValueOperand,
 )
 from brickql.schema.query_plan import QueryPlan
+from brickql.schema.converters import schema_from_sqlalchemy
 from brickql.schema.snapshot import (
     ColumnInfo,
     RelationshipInfo,
@@ -86,6 +87,8 @@ __all__ = [
     # Schema types
     "QueryPlan",
     "SchemaSnapshot",
+    # Converters
+    "schema_from_sqlalchemy",
     "TableInfo",
     "ColumnInfo",
     "RelationshipInfo",

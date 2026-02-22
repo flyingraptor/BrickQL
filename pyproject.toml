@@ -30,6 +30,11 @@ dependencies = [
 postgres = [
     "psycopg[binary]>=3.3",
 ]
+# SQLAlchemy engine reflector — used by schema_from_sqlalchemy().
+# pip install "brickql[sqlalchemy]"
+sqlalchemy = [
+    "sqlalchemy>=2.0",
+]
 examples = [
     # LangChain + Ollama integration for the examples/ runner
     "langchain>=1.2.10",
@@ -40,6 +45,7 @@ dev = [
     "pytest>=9.0",
     "pytest-docker>=3.2",
     "psycopg[binary]>=3.3",
+    "sqlalchemy>=2.0",
     # linting & formatting (ruff replaces flake8 + isort + black)
     "ruff>=0.15",
     # type checking
