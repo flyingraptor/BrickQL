@@ -1,4 +1,4 @@
-# BrinkQL – development task runner
+# brickQL – development task runner
 # Usage: make <target>   (assumes .venv is active or use `make venv` first)
 
 VENV     := .venv
@@ -22,14 +22,14 @@ install: venv  ## Install the package + all dev dependencies
 	$(PIP) install -e ".[dev]"
 
 lint:  ## Run ruff linter
-	$(RUFF) check brinkql/ tests/
+	$(RUFF) check brickql/ tests/
 
 fmt:  ## Auto-format with ruff
-	$(RUFF) format brinkql/ tests/
-	$(RUFF) check --fix brinkql/ tests/
+	$(RUFF) format brickql/ tests/
+	$(RUFF) check --fix brickql/ tests/
 
 typecheck:  ## Run mypy static type checker
-	$(MYPY) brinkql/
+	$(MYPY) brickql/
 
 test-unit:  ## Run unit tests (no DB required)
 	$(PYTEST) tests/ -m "not integration and not postgres" -v
@@ -48,7 +48,7 @@ test-integration-postgres:  ## Run PostgreSQL integration tests (requires Docker
 	docker-compose up -d postgres
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 5
-	BRINKQL_PG_DSN="host=localhost port=5432 dbname=brinkql user=brinkql password=brinkql" \
+	brickQL_PG_DSN="host=localhost port=5432 dbname=brickql user=brickql password=brickql" \
 		$(PYTEST) tests/integration/test_postgres.py -v -m postgres
 
 test:  ## Run all tests except Postgres integration

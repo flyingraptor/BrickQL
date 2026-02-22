@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from brinkql.errors import (
+from brickql.errors import (
     DialectViolationError,
     InvalidJoinRelError,
     SchemaError,
     ValidationError,
 )
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.expressions import (
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.expressions import (
     ALL_PREDICATE_OPS,
     COMPARISON_OPS,
     EXISTS_OPS,
@@ -29,8 +29,8 @@ from brinkql.schema.expressions import (
     RANGE_OPS,
     operand_kind,
 )
-from brinkql.schema.query_plan import QueryPlan
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.schema.query_plan import QueryPlan
+from brickql.schema.snapshot import SchemaSnapshot
 
 
 class PlanValidator:
@@ -314,7 +314,7 @@ class PlanValidator:
 
     def _validate_func(self, expr: dict) -> None:
         """Validate a function call operand."""
-        from brinkql.schema.expressions import AGGREGATE_FUNCTIONS  # noqa: PLC0415
+        from brickql.schema.expressions import AGGREGATE_FUNCTIONS  # noqa: PLC0415
 
         func_name = expr.get("func", "")
         allowed_funcs = self._dialect.allowed.functions

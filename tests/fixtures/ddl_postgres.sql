@@ -1,4 +1,4 @@
--- PostgreSQL DDL for BrinkQL integration tests
+-- PostgreSQL DDL for brickQL integration tests
 -- BOOLEAN native type (TRUE / FALSE)
 -- DATE / TIMESTAMP WITH TIME ZONE native types
 -- JSONB for structured metadata

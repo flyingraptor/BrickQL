@@ -1,6 +1,6 @@
 """Integration tests: compile → execute against a real PostgreSQL instance.
 
-Uses BRINKQL_PG_DSN (e.g. from Makefile when running make test-integration-postgres).
+Uses brickQL_PG_DSN (e.g. from Makefile when running make test-integration-postgres).
 Skips all tests if the env var is unset or connection fails.
 Mirrors the SQLite integration tests for the same capability levels.
 """
@@ -16,10 +16,10 @@ try:
 except ImportError:
     psycopg = None  # type: ignore[assignment]
 
-import brinkql
-from brinkql.policy.engine import PolicyConfig, TablePolicy
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.query_plan import (
+import brickql
+from brickql.policy.engine import PolicyConfig, TablePolicy
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.query_plan import (
     CTEClause,
     FromClause,
     JoinClause,
@@ -57,9 +57,9 @@ POLICY = PolicyConfig(
 
 
 def _get_pg_connection():
-    dsn = os.environ.get("BRINKQL_PG_DSN")
+    dsn = os.environ.get("brickQL_PG_DSN")
     if not dsn:
-        pytest.skip("BRINKQL_PG_DSN not set")
+        pytest.skip("brickQL_PG_DSN not set")
     try:
         return psycopg.connect(dsn)
     except Exception as e:
@@ -158,7 +158,7 @@ def _build_dialect(level: int) -> DialectProfile:
 def _run(conn, plan: QueryPlan, level: int, runtime: dict | None = None) -> list:
     plan_json = plan.model_dump_json(exclude_none=True)
     dialect = _build_dialect(level)
-    compiled = brinkql.validate_and_compile(plan_json, SNAPSHOT, dialect, POLICY)
+    compiled = brickql.validate_and_compile(plan_json, SNAPSHOT, dialect, POLICY)
     effective_runtime = {"TENANT": TENANT}
     if runtime:
         effective_runtime.update(runtime)

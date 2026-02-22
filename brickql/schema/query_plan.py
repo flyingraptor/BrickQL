@@ -1,4 +1,4 @@
-"""Pydantic models for the BrinkQL QueryPlan.
+"""Pydantic models for the brickQL QueryPlan.
 
 The LLM outputs a single JSON object matching the ``QueryPlan`` shape.
 All clause keys are optional; unused keys must be omitted.

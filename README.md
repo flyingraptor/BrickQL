@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="BrinkQL" width="420" />
+  <img src="logo.svg" alt="brickQL" width="420" />
 </p>
 
 # Description
@@ -8,14 +8,14 @@
 
 > Build Queries. Don't Generate Them.
 
-BrinkQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JSON)**; BrinkQL validates it against your schema, enforces policy rules, and compiles it to safe, parameterized SQL. Raw SQL never touches the LLM.
+brickQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JSON)**; brickQL validates it against your schema, enforces policy rules, and compiles it to safe, parameterized SQL. Raw SQL never touches the LLM.
 
 ---
 
 ## How it works
 
 <p align="center">
-  <img src="docs/how-it-works.png" alt="BrinkQL flow diagram" width="500" />
+  <img src="docs/how-it-works.png" alt="brickQL flow diagram" width="500" />
 </p>
 
 ---
@@ -24,10 +24,10 @@ BrinkQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JS
 
 ```bash
 # Core library (SQLite only)
-pip install brinkql
+pip install brickql
 
 # With PostgreSQL driver (psycopg v3)
-pip install "brinkql[postgres]"
+pip install "brickql[postgres]"
 ```
 
 Requires Python ≥ 3.10.
@@ -37,8 +37,8 @@ Requires Python ≥ 3.10.
 ## Quick start
 
 ```python
-import brinkql
-from brinkql import SchemaSnapshot, DialectProfile, PolicyConfig, TablePolicy
+import brickql
+from brickql import SchemaSnapshot, DialectProfile, PolicyConfig, TablePolicy
 
 # 1. Load your schema snapshot (describes tables, columns, relationships)
 import json
@@ -65,9 +65,9 @@ policy = PolicyConfig(
 # 4. Compile the LLM's QueryPlan JSON
 plan_json = llm_response  # {"SELECT": [...], "FROM": {...}, "JOIN": [...], ...}
 
-compiled = brinkql.validate_and_compile(plan_json, snapshot, dialect, policy)
+compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
 
-# 5. Execute with your own connection — BrinkQL does not execute queries
+# 5. Execute with your own connection — brickQL does not execute queries
 cursor.execute(compiled.sql, compiled.merge_runtime_params({"TENANT": tenant_id}))
 ```
 
@@ -172,7 +172,7 @@ profile = (
 per-table rules — each table can have its own param-bound columns and denied columns.
 
 ```python
-from brinkql import PolicyConfig, TablePolicy
+from brickql import PolicyConfig, TablePolicy
 
 policy = PolicyConfig(
     inject_missing_params=True,
@@ -215,7 +215,7 @@ cursor.execute(compiled.sql, sql_params)
 ## Prompting the LLM
 
 ```python
-components = brinkql.get_prompt_components(
+components = brickql.get_prompt_components(
     snapshot=snapshot,
     dialect=dialect,
     question="List the top 5 highest-paid employees in Engineering",
@@ -230,13 +230,13 @@ response = llm.chat(system=components.system_prompt, user=components.user_prompt
 
 ## Error handling
 
-All errors are subclasses of `BrinkQLError` and carry a machine-readable `code` and `details` dict — designed for LLM repair loops.
+All errors are subclasses of `brickQLError` and carry a machine-readable `code` and `details` dict — designed for LLM repair loops.
 
 ```python
-from brinkql import ParseError, ValidationError, CompilationError
+from brickql import ParseError, ValidationError, CompilationError
 
 try:
-    compiled = brinkql.validate_and_compile(plan_json, snapshot, dialect, policy)
+    compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
 except ParseError as e:
     # Malformed JSON or invalid QueryPlan structure
     pass
@@ -279,13 +279,13 @@ make test-integration-postgres
 ## Repository layout
 
 ```
-brinkql/
+brickql/
   schema/           # QueryPlan, SchemaSnapshot, DialectProfile, expression constants
   validate/         # PlanValidator — structural, semantic, dialect checks
   policy/           # PolicyEngine, PolicyConfig — param injection and limits
   compile/          # QueryBuilder, PostgresCompiler, SQLiteCompiler → parameterized SQL
   prompt/           # PromptBuilder → system + user prompts for the LLM
-  errors.py         # Exception hierarchy (BrinkQLError and subclasses)
+  errors.py         # Exception hierarchy (brickQLError and subclasses)
 examples/
   cases/            # Named test cases (c01–c10) covering SQL feature categories
   trials/           # Runtime trial outputs — gitignored, generated locally

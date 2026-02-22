@@ -14,9 +14,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from brinkql.policy.engine import PolicyConfig
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.policy.engine import PolicyConfig
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.snapshot import SchemaSnapshot
 
 _SYSTEM_PROMPT_TEMPLATE = """\
 You are a query planner for a SQL database.
@@ -234,7 +234,7 @@ class PromptBuilder:
     def _build_schema_summary(self) -> str:
         """Serialise the schema snapshot as a prompt-friendly JSON string.
 
-        If a :class:`~brinkql.policy.engine.PolicyConfig` was supplied,
+        If a :class:`~brickql.policy.engine.PolicyConfig` was supplied,
         param-bound column annotations are included so the LLM knows which
         columns must use ``{"param": "PARAM_NAME"}`` rather than literals.
         """

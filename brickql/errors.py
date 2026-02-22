@@ -1,18 +1,18 @@
-"""Custom exception hierarchy for BrinkQL.
+"""Custom exception hierarchy for brickQL.
 
-All public errors inherit from BrinkQLError so callers can catch the base
-class for any BrinkQL-specific failure.
+All public errors inherit from brickQLError so callers can catch the base
+class for any brickQL-specific failure.
 """
 from __future__ import annotations
 
 from typing import Any
 
 
-class BrinkQLError(Exception):
-    """Base exception for all BrinkQL errors."""
+class brickQLError(Exception):
+    """Base exception for all brickQL errors."""
 
 
-class ParseError(BrinkQLError):
+class ParseError(brickQLError):
     """Raised when input cannot be parsed as valid QueryPlan JSON.
 
     Args:
@@ -25,7 +25,7 @@ class ParseError(BrinkQLError):
         self.raw = raw
 
 
-class ValidationError(BrinkQLError):
+class ValidationError(brickQLError):
     """Raised when a QueryPlan fails structural or semantic validation.
 
     Args:
@@ -131,7 +131,7 @@ class SchemaError(ValidationError):
         super().__init__(message, code="SCHEMA_ERROR", details=details or {})
 
 
-class ProfileConfigError(BrinkQLError):
+class ProfileConfigError(brickQLError):
     """Raised when a DialectProfile is misconfigured.
 
     Detected at :meth:`DialectProfileBuilder.build` time — before any query
@@ -155,7 +155,7 @@ class ProfileConfigError(BrinkQLError):
         self.reason = reason or ""
 
 
-class CompilationError(BrinkQLError):
+class CompilationError(brickQLError):
     """Raised when SQL compilation fails for an unexpected reason.
 
     Args:

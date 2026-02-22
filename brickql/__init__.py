@@ -1,4 +1,4 @@
-"""BrinkQL – Policy-driven SQL query orchestration for LLM planners.
+"""brickQL – Policy-driven SQL query orchestration for LLM planners.
 
 Build Queries. Don't Generate Them.
 
@@ -21,12 +21,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from brinkql.compile.base import CompiledSQL
-from brinkql.compile.builder import QueryBuilder
-from brinkql.compile.postgres import PostgresCompiler
-from brinkql.compile.sqlite import SQLiteCompiler
-from brinkql.errors import (
-    BrinkQLError,
+from brickql.compile.base import CompiledSQL
+from brickql.compile.builder import QueryBuilder
+from brickql.compile.postgres import PostgresCompiler
+from brickql.compile.sqlite import SQLiteCompiler
+from brickql.errors import (
+    brickQLError,
     CompilationError,
     DialectViolationError,
     DisallowedColumnError,
@@ -38,17 +38,17 @@ from brinkql.errors import (
     SchemaError,
     ValidationError,
 )
-from brinkql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
-from brinkql.prompt.builder import PromptBuilder, PromptComponents
-from brinkql.schema.dialect import AllowedFeatures, DialectProfile, DialectProfileBuilder
-from brinkql.schema.query_plan import QueryPlan
-from brinkql.schema.snapshot import (
+from brickql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
+from brickql.prompt.builder import PromptBuilder, PromptComponents
+from brickql.schema.dialect import AllowedFeatures, DialectProfile, DialectProfileBuilder
+from brickql.schema.query_plan import QueryPlan
+from brickql.schema.snapshot import (
     ColumnInfo,
     RelationshipInfo,
     SchemaSnapshot,
     TableInfo,
 )
-from brinkql.validate.validator import PlanValidator
+from brickql.validate.validator import PlanValidator
 
 __all__ = [
     # Core pipeline
@@ -76,7 +76,7 @@ __all__ = [
     "PromptBuilder",
     "PromptComponents",
     # Errors
-    "BrinkQLError",
+    "brickQLError",
     "ProfileConfigError",
     "ParseError",
     "ValidationError",
@@ -103,9 +103,9 @@ def validate_and_compile(
 ) -> CompiledSQL:
     """Parse, validate, apply policy, and compile a QueryPlan JSON string.
 
-    This is the main entry point for the BrinkQL pipeline::
+    This is the main entry point for the brickQL pipeline::
 
-        compiled = brinkql.validate_and_compile(
+        compiled = brickql.validate_and_compile(
             plan_json=llm_output,
             snapshot=schema_snapshot,
             dialect=DialectProfile.builder(["employees"]).joins().build(),

@@ -1,7 +1,7 @@
 """PostgreSQL dialect compiler."""
 from __future__ import annotations
 
-from brinkql.compile.base import SQLCompiler
+from brickql.compile.base import SQLCompiler
 
 
 class PostgresCompiler(SQLCompiler):

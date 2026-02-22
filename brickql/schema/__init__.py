@@ -1,6 +1,6 @@
-"""BrinkQL schema models: QueryPlan, SchemaSnapshot, DialectProfile."""
-from brinkql.schema.dialect import AllowedFeatures, DialectProfile
-from brinkql.schema.query_plan import (
+"""brickQL schema models: QueryPlan, SchemaSnapshot, DialectProfile."""
+from brickql.schema.dialect import AllowedFeatures, DialectProfile
+from brickql.schema.query_plan import (
     CTEClause,
     FromClause,
     JoinClause,
@@ -13,7 +13,7 @@ from brinkql.schema.query_plan import (
     WindowFrame,
     WindowSpec,
 )
-from brinkql.schema.snapshot import (
+from brickql.schema.snapshot import (
     ColumnInfo,
     RelationshipInfo,
     SchemaSnapshot,

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 
-from brinkql.policy.engine import PolicyConfig, TablePolicy
-from brinkql.prompt.builder import PromptBuilder
-from brinkql.schema.dialect import DialectProfile
+from brickql.policy.engine import PolicyConfig, TablePolicy
+from brickql.prompt.builder import PromptBuilder
+from brickql.schema.dialect import DialectProfile
 from tests.fixtures import load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()

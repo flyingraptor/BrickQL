@@ -12,10 +12,10 @@ import sqlite3
 
 import pytest
 
-import brinkql
-from brinkql.policy.engine import PolicyConfig, TablePolicy
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.query_plan import (
+import brickql
+from brickql.policy.engine import PolicyConfig, TablePolicy
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.query_plan import (
     CTEClause,
     FromClause,
     JoinClause,
@@ -172,7 +172,7 @@ def _build_dialect(level: int) -> DialectProfile:
 def _run(conn, plan: QueryPlan, level: int, runtime: dict | None = None) -> list:
     plan_json = plan.model_dump_json(exclude_none=True)
     dialect = _build_dialect(level)
-    compiled = brinkql.validate_and_compile(plan_json, SNAPSHOT, dialect, POLICY)
+    compiled = brickql.validate_and_compile(plan_json, SNAPSHOT, dialect, POLICY)
     effective_runtime = {"TENANT": TENANT}
     if runtime:
         effective_runtime.update(runtime)

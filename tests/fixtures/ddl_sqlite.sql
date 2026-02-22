@@ -1,4 +1,4 @@
--- SQLite DDL for BrinkQL integration tests
+-- SQLite DDL for brickQL integration tests
 -- BOOLEAN stored as INTEGER (1=true, 0=false)
 -- DATE / TIMESTAMP stored as TEXT (ISO-8601)
 -- JSON stored as TEXT

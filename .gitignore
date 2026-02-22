@@ -41,7 +41,7 @@ htmlcov/
 .DS_Store
 
 # Docker volumes
-brinkql_pgdata/
+brickql_pgdata/
 
 # Environment variable files
 .env

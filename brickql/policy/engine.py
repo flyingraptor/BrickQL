@@ -5,13 +5,13 @@
 * **Parameter-bound columns** – columns designated by :class:`TablePolicy` must
   appear with ``{"param": "PARAM_NAME"}`` rather than a literal value.  If a
   predicate is missing, the engine can optionally inject it automatically or
-  raise :class:`~brinkql.errors.MissingParamError`.
+  raise :class:`~brickql.errors.MissingParamError`.
 * **Table / column allowlists** – globally or per-table denied columns are
   blocked before compilation.
 * **LIMIT enforcement** – clamps or rejects LIMIT values that exceed the max.
 
 Runtime policy is configured entirely in :class:`PolicyConfig` and
-:class:`TablePolicy`.  The :class:`~brinkql.schema.snapshot.SchemaSnapshot`
+:class:`TablePolicy`.  The :class:`~brickql.schema.snapshot.SchemaSnapshot`
 remains a pure structural description of the database; it carries no policy.
 
 Example — multi-tenant setup with per-table param names::
@@ -30,7 +30,7 @@ Example — multi-tenant setup with per-table param names::
         },
     )
 
-    compiled = brinkql.validate_and_compile(plan_json, snapshot, dialect, policy)
+    compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
     params = compiled.merge_runtime_params({"TENANT": tenant_id})
     cursor.execute(compiled.sql, params)
 """
@@ -39,15 +39,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from brinkql.errors import (
+from brickql.errors import (
     DisallowedColumnError,
     DisallowedTableError,
     MissingParamError,
 )
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.expressions import OPERAND_KEYS
-from brinkql.schema.query_plan import LimitClause, QueryPlan
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.expressions import OPERAND_KEYS
+from brickql.schema.query_plan import LimitClause, QueryPlan
+from brickql.schema.snapshot import SchemaSnapshot
 
 
 @dataclass
@@ -80,7 +80,7 @@ class PolicyConfig:
         denied_columns: Column names denied globally (across all tables).
         inject_missing_params: If ``True``, automatically inject param-bound
             predicates that the LLM omitted.  If ``False``, raise
-            :class:`~brinkql.errors.MissingParamError` instead.
+            :class:`~brickql.errors.MissingParamError` instead.
         default_limit: If the plan has no LIMIT clause, inject this value
             (``0`` = no injection).
     """

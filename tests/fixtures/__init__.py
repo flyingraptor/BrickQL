@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.schema.snapshot import SchemaSnapshot
 
 _FIXTURES_DIR = Path(__file__).parent
 

@@ -1,10 +1,10 @@
-"""Shared pytest fixtures for BrinkQL unit and integration tests."""
+"""Shared pytest fixtures for brickQL unit and integration tests."""
 from __future__ import annotations
 
 import pytest
 
-from brinkql.schema.dialect import DialectProfile
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.snapshot import SchemaSnapshot
 from tests.fixtures import load_schema_snapshot
 
 ALL_TABLES = [

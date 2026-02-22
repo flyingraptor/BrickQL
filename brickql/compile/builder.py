@@ -11,9 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from brinkql.compile.base import CompiledSQL, SQLCompiler
-from brinkql.errors import CompilationError
-from brinkql.schema.query_plan import (
+from brickql.compile.base import CompiledSQL, SQLCompiler
+from brickql.errors import CompilationError
+from brickql.schema.query_plan import (
     CTEClause,
     FromClause,
     JoinClause,
@@ -23,7 +23,7 @@ from brinkql.schema.query_plan import (
     SetOpClause,
     WindowSpec,
 )
-from brinkql.schema.snapshot import SchemaSnapshot
+from brickql.schema.snapshot import SchemaSnapshot
 
 
 @dataclass

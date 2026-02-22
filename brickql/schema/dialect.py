@@ -7,7 +7,7 @@ allowed capabilities.  Enforcement is done by the validator and compiler.
 Create a profile through the builder — compose exactly the features you need,
 in any combination, with no hidden stacking::
 
-    from brinkql import DialectProfile
+    from brickql import DialectProfile
 
     # Joins + aggregations only (no CTEs, no window functions, etc.)
     profile = (
@@ -44,8 +44,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from brinkql.errors import ProfileConfigError
-from brinkql.schema.expressions import (
+from brickql.errors import ProfileConfigError
+from brickql.schema.expressions import (
     AGGREGATE_FUNCTIONS,
     ALL_PREDICATE_OPS,
     WINDOW_FUNCTIONS,
