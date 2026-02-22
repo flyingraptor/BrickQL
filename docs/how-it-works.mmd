@@ -1,0 +1,18 @@
+flowchart TD
+    A([User question]) --> B[LLM Planner]
+    B --> C[QueryPlan JSON]
+
+    C --> D[1. Parse Pydantic model validation]
+    D --> E[2. Validate Schema + dialect rules]
+    E --> F[3. Policy Param injection · limits]
+    F --> G[4. Compile Parameterized SQL]
+
+    G --> H([CompiledSQL sql + params])
+    H --> I([Your DB executor])
+
+    subgraph brinkql[" BrinkQL "]
+        D
+        E
+        F
+        G
+    end

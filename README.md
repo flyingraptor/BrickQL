@@ -14,27 +14,9 @@ BrinkQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JS
 
 ## How it works
 
-```
-User question
-     │
-     ▼
-  LLM Planner  ──►  QueryPlan JSON
-                          │
-                    ┌─────▼──────┐
-                    │ BrinkQL   │
-                    │            │
-                    │  1. Parse  │  Pydantic model validation
-                    │  2. Validate│  Schema + dialect rules
-                    │  3. Policy │  Param injection, limits
-                    │  4. Compile│  → parameterized SQL
-                    └─────┬──────┘
-                          │
-                     CompiledSQL
-                    (sql + params)
-                          │
-                          ▼
-                    Your DB executor
-```
+<p align="center">
+  <img src="docs/how-it-works.png" alt="BrinkQL flow diagram" width="500" />
+</p>
 
 ---
 
