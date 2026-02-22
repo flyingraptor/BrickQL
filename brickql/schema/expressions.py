@@ -7,43 +7,116 @@ validator and the compiler.
 """
 from __future__ import annotations
 
+from enum import Enum
+
 # ---------------------------------------------------------------------------
-# Operand key constants
+# Operand kind enum
+# ---------------------------------------------------------------------------
+
+
+class OperandKind(str, Enum):
+    """The discriminator key for each operand type."""
+
+    COL = "col"
+    VALUE = "value"
+    PARAM = "param"
+    FUNC = "func"
+    CASE = "case"
+
+
+# ---------------------------------------------------------------------------
+# Predicate operator enums
+# ---------------------------------------------------------------------------
+
+
+class ComparisonOp(str, Enum):
+    """Binary comparison operators (2 operands)."""
+
+    EQ = "EQ"
+    NE = "NE"
+    GT = "GT"
+    GTE = "GTE"
+    LT = "LT"
+    LTE = "LTE"
+
+
+class PatternOp(str, Enum):
+    """Pattern-match operators (2 operands: value, pattern)."""
+
+    LIKE = "LIKE"
+    ILIKE = "ILIKE"
+
+
+class RangeOp(str, Enum):
+    """Range operator (3 operands: value, low, high)."""
+
+    BETWEEN = "BETWEEN"
+
+
+class MembershipOp(str, Enum):
+    """Membership operator (operand + values or subquery)."""
+
+    IN = "IN"
+
+
+class NullOp(str, Enum):
+    """Null-check operators (1 operand)."""
+
+    IS_NULL = "IS_NULL"
+    IS_NOT_NULL = "IS_NOT_NULL"
+
+
+class ExistsOp(str, Enum):
+    """Existence operator (subquery argument)."""
+
+    EXISTS = "EXISTS"
+
+
+class LogicalOp(str, Enum):
+    """Logical connectives."""
+
+    AND = "AND"
+    OR = "OR"
+    NOT = "NOT"
+
+
+# ---------------------------------------------------------------------------
+# Operand key constants (keep frozenset for O(1) membership tests)
 # ---------------------------------------------------------------------------
 
 #: The single key that identifies each operand type.
-OPERAND_KEYS: frozenset[str] = frozenset({"col", "value", "param", "func", "case"})
+OPERAND_KEYS: frozenset[str] = frozenset(k.value for k in OperandKind)
 
 # ---------------------------------------------------------------------------
 # Predicate operator groups
 # ---------------------------------------------------------------------------
 
 #: Binary comparison operators: take a 2-element list of operands.
-COMPARISON_OPS: frozenset[str] = frozenset({"EQ", "NE", "GT", "GTE", "LT", "LTE"})
+COMPARISON_OPS: frozenset[str] = frozenset(op.value for op in ComparisonOp)
 
 #: Pattern-match operators: take [operand, pattern_operand].
-PATTERN_OPS: frozenset[str] = frozenset({"LIKE", "ILIKE"})
+PATTERN_OPS: frozenset[str] = frozenset(op.value for op in PatternOp)
 
 #: Range operator: takes [value, low, high].
-RANGE_OPS: frozenset[str] = frozenset({"BETWEEN"})
+RANGE_OPS: frozenset[str] = frozenset(op.value for op in RangeOp)
 
 #: Membership operator: takes [operand, val1, val2, ...] or [operand, subquery].
-MEMBERSHIP_OPS: frozenset[str] = frozenset({"IN"})
+MEMBERSHIP_OPS: frozenset[str] = frozenset(op.value for op in MembershipOp)
 
 #: Null-check operators: take a single operand.
-NULL_OPS: frozenset[str] = frozenset({"IS_NULL", "IS_NOT_NULL"})
+NULL_OPS: frozenset[str] = frozenset(op.value for op in NullOp)
 
 #: Existence operator: takes a subquery.
-EXISTS_OPS: frozenset[str] = frozenset({"EXISTS"})
+EXISTS_OPS: frozenset[str] = frozenset(op.value for op in ExistsOp)
 
 #: Logical AND / OR: take a list of sub-predicates.
-LOGICAL_AND_OR: frozenset[str] = frozenset({"AND", "OR"})
+LOGICAL_AND_OR: frozenset[str] = frozenset({LogicalOp.AND.value, LogicalOp.OR.value})
 
 #: Logical NOT: takes a single sub-predicate.
-LOGICAL_NOT: frozenset[str] = frozenset({"NOT"})
+LOGICAL_NOT: frozenset[str] = frozenset({LogicalOp.NOT.value})
 
 #: All logical operators.
-LOGICAL_OPS: frozenset[str] = LOGICAL_AND_OR | LOGICAL_NOT
+LOGICAL_OPS: frozenset[str] = frozenset(op.value for op in LogicalOp)
 
 #: Complete set of supported predicate operators.
 ALL_PREDICATE_OPS: frozenset[str] = (

@@ -45,7 +45,6 @@ from brickql.errors import (
     MissingParamError,
 )
 from brickql.schema.dialect import DialectProfile
-from brickql.schema.expressions import OPERAND_KEYS
 from brickql.schema.query_plan import LimitClause, QueryPlan
 from brickql.schema.snapshot import SchemaSnapshot
 
@@ -90,6 +89,24 @@ class PolicyConfig:
     denied_columns: list[str] = field(default_factory=list)
     inject_missing_params: bool = True
     default_limit: int = 100
+
+    def denied_columns_for(self, table_name: str) -> list[str]:
+        """Return the combined denied column list for a specific table.
+
+        Merges the global :attr:`denied_columns` with any per-table denied
+        columns configured in :attr:`tables`.  This delegation method avoids
+        Law-of-Demeter violations in callers that would otherwise chain through
+        ``config.tables.get(table).denied_columns``.
+
+        Args:
+            table_name: The table to look up.
+
+        Returns:
+            De-duplicated list of denied column names.
+        """
+        tpol = self.tables.get(table_name)
+        table_denied = tpol.denied_columns if tpol is not None else []
+        return list(set(self.denied_columns) | set(table_denied))
 
 
 class PolicyEngine:
@@ -154,15 +171,17 @@ class PolicyEngine:
     def _check_table_allowlist(self, plan: QueryPlan) -> None:
         if not self._config.allowed_tables:
             return
-        for table in self._collect_table_refs(plan):
+        for table in self._collect_all_table_refs(plan):
             if table not in self._config.allowed_tables:
                 raise DisallowedTableError(table, self._config.allowed_tables)
 
-    def _collect_table_refs(self, plan: QueryPlan) -> list[str]:
-        """Collect all table names referenced in the plan."""
-        tables: list[str] = []
-        if plan.FROM and plan.FROM.table:
-            tables.append(plan.FROM.table)
+    def _collect_all_table_refs(self, plan: QueryPlan) -> list[str]:
+        """Collect direct + JOIN-resolved table names.
+
+        Combines the domain-level ``collect_table_references()`` (FROM only)
+        with JOIN relationship resolution that requires the snapshot.
+        """
+        tables: list[str] = list(plan.collect_table_references())
         if plan.JOIN:
             for join in plan.JOIN:
                 rel = self._snapshot.get_relationship(join.rel)
@@ -175,20 +194,18 @@ class PolicyEngine:
     # ------------------------------------------------------------------
 
     def _check_denied_columns(self, plan: QueryPlan) -> None:
-        col_refs = self._collect_col_refs_from_plan(plan)
-        for col_ref in col_refs:
+        for col_ref in plan.collect_col_refs():
             self._assert_col_not_denied(col_ref)
 
     def _assert_col_not_denied(self, col_ref: str) -> None:
         col_name = col_ref.split(".")[-1]
         table_name = col_ref.split(".")[0] if "." in col_ref else None
 
-        # Global deny list.
-        globally_denied = col_ref in self._config.denied_columns or (
-            col_name in self._config.denied_columns
+        globally_denied = (
+            col_ref in self._config.denied_columns
+            or col_name in self._config.denied_columns
         )
 
-        # Per-table deny list.
         per_table_denied = False
         if table_name:
             tpol = self._config.tables.get(table_name)
@@ -196,35 +213,14 @@ class PolicyEngine:
 
         if globally_denied or per_table_denied:
             if table_name:
-                table = self._snapshot.get_table(table_name)
-                global_denied_set = set(self._config.denied_columns)
-                table_denied_set = set(
-                    (self._config.tables.get(table_name) or TablePolicy()).denied_columns
-                )
-                all_denied = global_denied_set | table_denied_set
+                all_denied = set(self._config.denied_columns_for(table_name))
                 allowed = [
-                    c.name
-                    for c in (table.columns if table else [])
-                    if c.name not in all_denied
+                    c
+                    for c in self._snapshot.get_column_names(table_name)
+                    if c not in all_denied
                 ]
                 raise DisallowedColumnError(table_name, col_name, allowed)
             raise DisallowedColumnError("", col_name, [])
-
-    def _collect_col_refs_from_plan(self, plan: QueryPlan) -> list[str]:
-        refs: list[str] = []
-        self._walk_for_col_refs(plan.model_dump(exclude_none=True), refs)
-        return refs
-
-    def _walk_for_col_refs(self, node: Any, refs: list[str]) -> None:
-        if isinstance(node, dict):
-            if "col" in node and set(node.keys()) <= OPERAND_KEYS:
-                refs.append(node["col"])
-            else:
-                for v in node.values():
-                    self._walk_for_col_refs(v, refs)
-        elif isinstance(node, list):
-            for item in node:
-                self._walk_for_col_refs(item, refs)
 
     # ------------------------------------------------------------------
     # Parameter-bound column enforcement
@@ -232,7 +228,7 @@ class PolicyEngine:
 
     def _enforce_param_bound_columns(self, plan: QueryPlan) -> QueryPlan:
         """Inject or verify param-bound predicates defined in TablePolicy."""
-        for table_name in set(self._collect_table_refs(plan)):
+        for table_name in set(self._collect_all_table_refs(plan)):
             tpol = self._config.tables.get(table_name)
             if not tpol or not tpol.param_bound_columns:
                 continue

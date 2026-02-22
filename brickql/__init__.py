@@ -15,15 +15,28 @@ Re-exported types
 -----------------
 ``QueryPlan``, ``SchemaSnapshot``, ``DialectProfile``, ``PolicyConfig``,
 ``CompiledSQL``, ``PromptComponents``, and all error classes.
+
+Extensibility
+-------------
+New dialect compilers can be registered via::
+
+    from brickql.compile.registry import CompilerFactory
+
+    @CompilerFactory.register("mysql")
+    class MySQLCompiler(SQLCompiler):
+        ...
+
+After registration, ``validate_and_compile`` picks it up automatically for
+any ``DialectProfile`` with ``target="mysql"``.
 """
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from brickql.compile.base import CompiledSQL
 from brickql.compile.builder import QueryBuilder
 from brickql.compile.postgres import PostgresCompiler
+from brickql.compile.registry import CompilerFactory
 from brickql.compile.sqlite import SQLiteCompiler
 from brickql.errors import (
     brickQLError,
@@ -40,7 +53,16 @@ from brickql.errors import (
 )
 from brickql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
 from brickql.prompt.builder import PromptBuilder, PromptComponents
+from brickql.schema.context import ValidationContext
 from brickql.schema.dialect import AllowedFeatures, DialectProfile, DialectProfileBuilder
+from brickql.schema.operands import (
+    CaseOperand,
+    ColumnOperand,
+    FuncOperand,
+    Operand,
+    ParamOperand,
+    ValueOperand,
+)
 from brickql.schema.query_plan import QueryPlan
 from brickql.schema.snapshot import (
     ColumnInfo,
@@ -49,6 +71,13 @@ from brickql.schema.snapshot import (
     TableInfo,
 )
 from brickql.validate.validator import PlanValidator
+
+# ---------------------------------------------------------------------------
+# Register built-in compilers with CompilerFactory (Item 4 — OCP)
+# ---------------------------------------------------------------------------
+
+CompilerFactory.register_class("postgres", PostgresCompiler)
+CompilerFactory.register_class("sqlite", SQLiteCompiler)
 
 __all__ = [
     # Core pipeline
@@ -63,12 +92,22 @@ __all__ = [
     "DialectProfile",
     "DialectProfileBuilder",
     "AllowedFeatures",
+    # Typed operands
+    "Operand",
+    "ColumnOperand",
+    "ValueOperand",
+    "ParamOperand",
+    "FuncOperand",
+    "CaseOperand",
+    # Contexts
+    "ValidationContext",
     # Policy
     "PolicyConfig",
     "TablePolicy",
     "PolicyEngine",
     # Compilation
     "CompiledSQL",
+    "CompilerFactory",
     "PostgresCompiler",
     "SQLiteCompiler",
     "QueryBuilder",
@@ -88,11 +127,6 @@ __all__ = [
     "SchemaError",
     "CompilationError",
 ]
-
-_COMPILERS = {
-    "postgres": PostgresCompiler,
-    "sqlite": SQLiteCompiler,
-}
 
 
 def validate_and_compile(
@@ -149,11 +183,8 @@ def validate_and_compile(
     # 3. Apply policy
     plan = PolicyEngine(policy, snapshot, dialect).apply(plan)
 
-    # 4. Compile
-    compiler_cls = _COMPILERS.get(dialect.target)
-    if compiler_cls is None:
-        raise CompilationError(f"Unsupported dialect target: '{dialect.target}'.")
-    compiler = compiler_cls()
+    # 4. Compile — dialect target resolved via CompilerFactory (OCP: no if-chain)
+    compiler = CompilerFactory.create(dialect.target)
     return QueryBuilder(compiler, snapshot).build(plan)
 
 

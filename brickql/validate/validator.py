@@ -1,45 +1,49 @@
-"""Plan validation: structural, semantic, and dialect checks.
+"""Plan validation orchestrator.
 
-``PlanValidator`` is a service class (Clean Architecture: use-case layer) that
-takes a parsed ``QueryPlan`` and validates it against a ``SchemaSnapshot`` and
-a ``DialectProfile``.  On the first violation it raises the appropriate custom
-exception so the caller can return it to the LLM for error repair.
+``PlanValidator`` is the public entry point.  It wires together the
+focused sub-validators and drives validation in the correct order.
+
+Sub-validator hierarchy
+-----------------------
+PlanValidator
+  ├── DialectValidator    (dialect_validator.py)  — feature-flag checks
+  ├── SchemaValidator     (schema_validator.py)   — table / column existence
+  ├── SemanticValidator   (semantic_validator.py) — HAVING / LIMIT rules
+  ├── OperandValidator    (operand_validator.py)  — typed operand checks
+  └── PredicateValidator  (operand_validator.py)  — predicate dict checks
+
+Item 11 — Inappropriate Intimacy fix: recursive sub-validation (for
+subqueries, CTEs, set-ops) no longer hard-codes ``PlanValidator(…)``.
+A ``sub_validator_factory`` is used instead; the default replicates the
+old behaviour and callers may inject a custom factory.
+
+Item 6 — Data Clumps fix: ``(snapshot, dialect)`` is packaged into the
+:class:`~brickql.schema.context.ValidationContext` value object and
+threaded to every sub-validator.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Callable
 
-from brickql.errors import (
-    DialectViolationError,
-    InvalidJoinRelError,
-    SchemaError,
-    ValidationError,
-)
+from brickql.errors import DialectViolationError, ValidationError
+from brickql.schema.context import ValidationContext
 from brickql.schema.dialect import DialectProfile
-from brickql.schema.expressions import (
-    ALL_PREDICATE_OPS,
-    COMPARISON_OPS,
-    EXISTS_OPS,
-    LOGICAL_AND_OR,
-    LOGICAL_NOT,
-    MEMBERSHIP_OPS,
-    NULL_OPS,
-    OPERAND_KEYS,
-    PATTERN_OPS,
-    RANGE_OPS,
-    operand_kind,
-)
 from brickql.schema.query_plan import QueryPlan
 from brickql.schema.snapshot import SchemaSnapshot
+from brickql.validate.dialect_validator import DialectValidator
+from brickql.validate.operand_validator import OperandValidator, PredicateValidator
+from brickql.validate.schema_validator import SchemaValidator
+from brickql.validate.semantic_validator import SemanticValidator
 
 
 class PlanValidator:
     """Validates a QueryPlan against a SchemaSnapshot and DialectProfile.
 
-    Responsibilities (in order):
-    1. Structural check – every referenced table / column exists in snapshot.
-    2. Dialect check – only allowed tables, operators, functions; feature flags.
-    3. Semantic check – join depth, LIMIT range, consistent FROM.
+    Responsibilities delegated to sub-validators (in order):
+    1. Dialect checks   – feature flags, allowed operators / functions.
+    2. Schema checks    – table and column existence, relationship keys.
+    3. Expression checks – operand structure, function allowlists.
+    4. Semantic checks  – HAVING/GROUP_BY pairing, LIMIT range.
 
     Raises the first violation as a subclass of ``ValidationError`` so the
     caller can convert it to a structured error response for LLM repair.
@@ -47,11 +51,22 @@ class PlanValidator:
     Args:
         snapshot: The schema the LLM was given.
         dialect: The dialect profile controlling allowed features.
+        sub_validator_factory: Optional factory for recursive sub-validation
+            (subqueries, CTEs, set-ops).  Defaults to
+            ``lambda: PlanValidator(snapshot, dialect)``.
     """
 
-    def __init__(self, snapshot: SchemaSnapshot, dialect: DialectProfile) -> None:
-        self._snapshot = snapshot
-        self._dialect = dialect
+    def __init__(
+        self,
+        snapshot: SchemaSnapshot,
+        dialect: DialectProfile,
+        sub_validator_factory: Callable[[], "PlanValidator"] | None = None,
+    ) -> None:
+        self._ctx = ValidationContext(snapshot=snapshot, dialect=dialect)
+        self._sub_validator_factory = sub_validator_factory or (
+            lambda: PlanValidator(snapshot, dialect)
+        )
+        # CTE / derived-table virtual names grow during validation.
         self._cte_names: frozenset[str] = frozenset()
 
     # ------------------------------------------------------------------
@@ -65,382 +80,120 @@ class PlanValidator:
 
         Args:
             plan: The parsed QueryPlan to validate.
-            cte_names: CTE names defined in an enclosing query; references to
-                these names are allowed even though they don't appear in the
-                snapshot.
+            cte_names: CTE names defined in an enclosing query.
 
         Raises:
-            ValidationError: (or subclass) on the first policy / schema / dialect
-                violation found.
+            ValidationError: (or subclass) on the first violation.
         """
-        self._cte_names: frozenset[str] = cte_names or frozenset()
-        # Collect CTE names defined in this plan itself so the main query
-        # (and nested CTEs) can reference them.
+        self._cte_names = cte_names or frozenset()
         if plan.CTE:
             self._cte_names = self._cte_names | frozenset(c.name for c in plan.CTE)
-        self._check_feature_flags(plan)
-        self._check_from(plan)
-        self._check_joins(plan)
-        self._check_select(plan)
-        self._check_where(plan)
-        self._check_group_by(plan)
-        self._check_having(plan)
-        self._check_order_by(plan)
-        self._check_limit(plan)
-        self._check_cte(plan)
-        self._check_set_op(plan)
+
+        sub_validators = self._make_sub_validators()
+
+        sub_validators["dialect"].validate_feature_flags(plan)
+        sub_validators["dialect"].validate_join_depth(plan)
+        sub_validators["dialect"].validate_window_functions(plan)
+
+        self._validate_from(plan, sub_validators)
+        sub_validators["schema"].validate_joins(plan)
+
+        self._validate_select(plan, sub_validators)
+        self._validate_where(plan, sub_validators)
+        self._validate_group_by(plan, sub_validators)
+
+        sub_validators["semantic"].validate_having(plan)
+        if plan.HAVING is not None and plan.GROUP_BY is not None:
+            sub_validators["pred"].validate(plan.HAVING)
+
+        self._validate_order_by(plan, sub_validators)
+        sub_validators["semantic"].validate_limit(plan)
+
+        self._validate_cte(plan)
+        self._validate_set_op(plan)
 
     # ------------------------------------------------------------------
-    # Feature-flag checks
+    # Clause validation helpers
     # ------------------------------------------------------------------
 
-    def _check_feature_flags(self, plan: QueryPlan) -> None:
-        allowed = self._dialect.allowed
-        if plan.JOIN and allowed.max_join_depth == 0:
-            raise DialectViolationError(
-                "JOINs are not allowed (max_join_depth=0).",
-                feature="join",
-            )
-        if plan.CTE and not allowed.allow_cte:
-            raise DialectViolationError(
-                "CTE (WITH) is not enabled in the dialect profile.",
-                feature="allow_cte",
-            )
-        if plan.SET_OP and not allowed.allow_set_operations:
-            raise DialectViolationError(
-                "Set operations (UNION/INTERSECT/EXCEPT) are not enabled.",
-                feature="allow_set_operations",
-            )
-        if plan.FROM and plan.FROM.subquery and not allowed.allow_subqueries:
-            raise DialectViolationError(
-                "Derived tables (subqueries in FROM) are not enabled.",
-                feature="allow_subqueries",
-            )
-
-    # ------------------------------------------------------------------
-    # FROM
-    # ------------------------------------------------------------------
-
-    def _check_from(self, plan: QueryPlan) -> None:
+    def _validate_from(self, plan: QueryPlan, sv: dict) -> None:
         if plan.FROM is None:
             return
         frm = plan.FROM
         if frm.table is not None:
-            self._assert_table_allowed(frm.table)
+            sv["schema"].assert_table_allowed(frm.table)
         elif frm.subquery is not None:
-            if not self._dialect.allowed.allow_subqueries:
+            if not self._ctx.dialect.allowed.allow_subqueries:
                 raise DialectViolationError(
-                    "Subquery in FROM is not enabled.",
-                    feature="allow_subqueries",
+                    "Subquery in FROM is not enabled.", feature="allow_subqueries"
                 )
-            # The alias of a derived table (FROM (subquery) AS alias) is a virtual
-            # table name.  Register it so that outer-query column refs like
-            # "alias.col" are not rejected as unknown tables.
             if frm.alias:
                 self._cte_names = self._cte_names | {frm.alias}
-            sub_validator = PlanValidator(self._snapshot, self._dialect)
-            sub_validator.validate(frm.subquery, cte_names=self._cte_names)
+                sv["schema"].cte_names = self._cte_names
+                sv["op"].cte_names = self._cte_names
+            self._sub_validator_factory().validate(
+                frm.subquery, cte_names=self._cte_names
+            )
         else:
             raise ValidationError(
                 "FROM clause must specify either 'table' or 'subquery'.",
                 code="SCHEMA_ERROR",
             )
 
-    # ------------------------------------------------------------------
-    # JOIN
-    # ------------------------------------------------------------------
-
-    def _check_joins(self, plan: QueryPlan) -> None:
-        if not plan.JOIN:
-            return
-        allowed = self._dialect.allowed
-        if len(plan.JOIN) > allowed.max_join_depth:
-            raise DialectViolationError(
-                f"Query uses {len(plan.JOIN)} JOIN(s) but max_join_depth="
-                f"{allowed.max_join_depth}.",
-                feature="max_join_depth",
-            )
-        for join in plan.JOIN:
-            rel = self._snapshot.get_relationship(join.rel)
-            if rel is None:
-                raise InvalidJoinRelError(
-                    join.rel,
-                    self._snapshot.relationship_keys,
-                )
-            self._assert_table_allowed(rel.from_table)
-            self._assert_table_allowed(rel.to_table)
-
-    # ------------------------------------------------------------------
-    # SELECT
-    # ------------------------------------------------------------------
-
-    def _check_select(self, plan: QueryPlan) -> None:
+    def _validate_select(self, plan: QueryPlan, sv: dict) -> None:
         if not plan.SELECT:
             return
         for item in plan.SELECT:
-            self._validate_operand(item.expr)
+            sv["op"].validate(item.expr)
             if item.over is not None:
-                if not self._dialect.allowed.allow_window_functions:
-                    raise DialectViolationError(
-                        "Window functions (OVER) are not enabled.",
-                        feature="allow_window_functions",
-                    )
                 for pb in item.over.partition_by:
-                    self._validate_operand(pb)
+                    sv["op"].validate(pb)
                 for ob in item.over.order_by:
-                    self._validate_operand(ob.expr)
+                    sv["op"].validate(ob.expr)
 
-    # ------------------------------------------------------------------
-    # WHERE / HAVING
-    # ------------------------------------------------------------------
-
-    def _check_where(self, plan: QueryPlan) -> None:
+    def _validate_where(self, plan: QueryPlan, sv: dict) -> None:
         if plan.WHERE is not None:
-            self._validate_predicate(plan.WHERE)
+            sv["pred"].validate(plan.WHERE)
 
-    def _check_having(self, plan: QueryPlan) -> None:
-        if plan.GROUP_BY is not None and plan.HAVING is not None:
-            self._validate_predicate(plan.HAVING)
-        elif plan.HAVING is not None and plan.GROUP_BY is None:
-            raise ValidationError(
-                "HAVING requires GROUP_BY.",
-                code="SCHEMA_ERROR",
-            )
-
-    # ------------------------------------------------------------------
-    # GROUP BY
-    # ------------------------------------------------------------------
-
-    def _check_group_by(self, plan: QueryPlan) -> None:
+    def _validate_group_by(self, plan: QueryPlan, sv: dict) -> None:
         if not plan.GROUP_BY:
             return
         for expr in plan.GROUP_BY:
-            self._validate_operand(expr)
+            sv["op"].validate(expr)
 
-    # ------------------------------------------------------------------
-    # ORDER BY
-    # ------------------------------------------------------------------
-
-    def _check_order_by(self, plan: QueryPlan) -> None:
+    def _validate_order_by(self, plan: QueryPlan, sv: dict) -> None:
         if not plan.ORDER_BY:
             return
         for item in plan.ORDER_BY:
-            self._validate_operand(item.expr)
+            sv["op"].validate(item.expr)
 
-    # ------------------------------------------------------------------
-    # LIMIT
-    # ------------------------------------------------------------------
-
-    def _check_limit(self, plan: QueryPlan) -> None:
-        if plan.LIMIT is None:
-            return
-        max_limit = self._dialect.allowed.max_limit
-        if plan.LIMIT.value <= 0:
-            raise ValidationError(
-                "LIMIT value must be a positive integer.",
-                code="SCHEMA_ERROR",
-            )
-        if plan.LIMIT.value > max_limit:
-            raise DialectViolationError(
-                f"LIMIT {plan.LIMIT.value} exceeds max_limit={max_limit}.",
-                feature="max_limit",
-            )
-
-    # ------------------------------------------------------------------
-    # CTE
-    # ------------------------------------------------------------------
-
-    def _check_cte(self, plan: QueryPlan) -> None:
+    def _validate_cte(self, plan: QueryPlan) -> None:
         if not plan.CTE:
             return
         for cte in plan.CTE:
-            sub_validator = PlanValidator(self._snapshot, self._dialect)
-            sub_validator.validate(cte.query)
+            self._sub_validator_factory().validate(cte.query)
 
-    # ------------------------------------------------------------------
-    # SET_OP
-    # ------------------------------------------------------------------
-
-    def _check_set_op(self, plan: QueryPlan) -> None:
+    def _validate_set_op(self, plan: QueryPlan) -> None:
         if plan.SET_OP is None:
             return
-        sub_validator = PlanValidator(self._snapshot, self._dialect)
-        sub_validator.validate(plan.SET_OP.query)
+        self._sub_validator_factory().validate(plan.SET_OP.query)
 
     # ------------------------------------------------------------------
-    # Operand validation
+    # Sub-validator wiring
     # ------------------------------------------------------------------
 
-    def _validate_operand(self, expr: Any) -> None:
-        """Recursively validate an operand dict."""
-        if not isinstance(expr, dict):
-            raise ValidationError(
-                f"Operand must be a dict, got {type(expr).__name__}.",
-                code="SCHEMA_ERROR",
-            )
-        kind = operand_kind(expr)
-        if kind is None:
-            raise ValidationError(
-                f"Unknown operand type: {list(expr.keys())}. "
-                f"Expected one of {sorted(OPERAND_KEYS)}.",
-                code="SCHEMA_ERROR",
-            )
-        if kind == "col":
-            self._validate_col_ref(expr["col"])
-        elif kind == "func":
-            self._validate_func(expr)
-        elif kind == "case":
-            self._validate_case(expr["case"])
+    def _make_sub_validators(self) -> dict:
+        """Construct and wire sub-validators for one validation run."""
+        pred_validator = PredicateValidator.__new__(PredicateValidator)
+        op_validator = OperandValidator(self._ctx, self._cte_names, pred_validator)
+        pred_validator.__init__(self._ctx, op_validator)  # type: ignore[misc]
 
-    def _validate_col_ref(self, col: str) -> None:
-        """Validate a ``table.column`` or bare ``column`` reference."""
-        if "." in col:
-            table_name, col_name = col.split(".", 1)
-            self._assert_table_allowed(table_name)
-            if table_name in self._cte_names:
-                return  # CTE columns are not in the snapshot; skip check
-            col_info = self._snapshot.get_column(table_name, col_name)
-            if col_info is None:
-                table = self._snapshot.get_table(table_name)
-                allowed = table.column_names if table else []
-                raise SchemaError(
-                    f"Column '{col_name}' does not exist on table '{table_name}'.",
-                    details={
-                        "table": table_name,
-                        "column": col_name,
-                        "allowed_columns": allowed,
-                    },
-                )
+        schema_validator = SchemaValidator(self._ctx, self._cte_names)
 
-    def _validate_func(self, expr: dict) -> None:
-        """Validate a function call operand."""
-        from brickql.schema.expressions import AGGREGATE_FUNCTIONS  # noqa: PLC0415
-
-        func_name = expr.get("func", "")
-        allowed_funcs = self._dialect.allowed.functions
-        is_aggregate = func_name in AGGREGATE_FUNCTIONS
-        # Aggregate functions are blocked when not explicitly listed as allowed.
-        if is_aggregate and func_name not in allowed_funcs:
-            raise DialectViolationError(
-                f"Aggregate function '{func_name}' is not allowed. "
-                f"Allowed functions: {allowed_funcs}.",
-                feature="functions",
-            )
-        # Non-aggregate scalar functions: only checked when the allowlist is non-empty.
-        if not is_aggregate and allowed_funcs and func_name not in allowed_funcs:
-            raise DialectViolationError(
-                f"Function '{func_name}' is not in the allowed functions list: "
-                f"{allowed_funcs}.",
-                feature="functions",
-            )
-        for arg in expr.get("args", []):
-            self._validate_operand(arg)
-
-    def _validate_case(self, case_body: dict) -> None:
-        """Validate a CASE expression body."""
-        for when in case_body.get("when", []):
-            self._validate_predicate(when.get("if") or when.get("condition", {}))
-            self._validate_operand(when.get("then", {}))
-        if "else" in case_body and case_body["else"] is not None:
-            self._validate_operand(case_body["else"])
-
-    # ------------------------------------------------------------------
-    # Predicate validation
-    # ------------------------------------------------------------------
-
-    def _validate_predicate(self, pred: Any) -> None:
-        """Recursively validate a predicate dict."""
-        if not isinstance(pred, dict) or len(pred) != 1:
-            raise ValidationError(
-                f"Predicate must be a single-key dict, got: {pred!r}",
-                code="SCHEMA_ERROR",
-            )
-        op = next(iter(pred))
-        if op not in ALL_PREDICATE_OPS:
-            raise ValidationError(
-                f"Unknown predicate operator '{op}'. "
-                f"Allowed: {sorted(ALL_PREDICATE_OPS)}.",
-                code="SCHEMA_ERROR",
-            )
-        self._assert_operator_allowed(op)
-        args = pred[op]
-
-        if op in COMPARISON_OPS:
-            self._expect_operand_list(args, op, count=2)
-        elif op in PATTERN_OPS:
-            self._expect_operand_list(args, op, count=2)
-        elif op in RANGE_OPS:
-            self._expect_operand_list(args, op, count=3)
-        elif op in MEMBERSHIP_OPS:
-            if not isinstance(args, list) or len(args) < 2:
-                raise ValidationError(
-                    f"IN requires at least 2 elements, got {args!r}.",
-                    code="SCHEMA_ERROR",
-                )
-            self._validate_operand(args[0])
-            for item in args[1:]:
-                if isinstance(item, dict) and "SELECT" in item:
-                    if not self._dialect.allowed.allow_subqueries:
-                        raise DialectViolationError(
-                            "Subquery in IN predicate is not enabled.",
-                            feature="allow_subqueries",
-                        )
-                else:
-                    self._validate_operand(item)
-        elif op in NULL_OPS:
-            self._validate_operand(args)
-        elif op in EXISTS_OPS:
-            if not self._dialect.allowed.allow_subqueries:
-                raise DialectViolationError(
-                    "EXISTS requires allow_subqueries=true.",
-                    feature="allow_subqueries",
-                )
-        elif op in LOGICAL_AND_OR:
-            if not isinstance(args, list) or len(args) < 2:
-                raise ValidationError(
-                    f"{op} requires at least 2 sub-predicates.",
-                    code="SCHEMA_ERROR",
-                )
-            for sub in args:
-                self._validate_predicate(sub)
-        elif op in LOGICAL_NOT:
-            self._validate_predicate(args)
-
-    def _expect_operand_list(
-        self, args: Any, op: str, count: int
-    ) -> None:
-        """Assert args is a list of exactly ``count`` operands."""
-        if not isinstance(args, list) or len(args) != count:
-            raise ValidationError(
-                f"{op} requires exactly {count} operands, got {args!r}.",
-                code="SCHEMA_ERROR",
-            )
-        for operand in args:
-            self._validate_operand(operand)
-
-    # ------------------------------------------------------------------
-    # Allowlist helpers
-    # ------------------------------------------------------------------
-
-    def _assert_table_allowed(self, table_name: str) -> None:
-        """Raise if the table is not in the snapshot (and not a CTE name)."""
-        if table_name in self._cte_names:
-            return  # CTE-defined virtual table; no snapshot entry needed
-        if self._snapshot.get_table(table_name) is None:
-            raise SchemaError(
-                f"Table '{table_name}' does not exist in the schema snapshot.",
-                details={
-                    "table": table_name,
-                    "allowed_tables": self._snapshot.table_names,
-                },
-            )
-
-    def _assert_operator_allowed(self, op: str) -> None:
-        """Raise DialectViolationError if the operator is not allowed."""
-        allowed_ops = self._dialect.allowed.operators
-        if allowed_ops and op not in allowed_ops:
-            raise DialectViolationError(
-                f"Operator '{op}' is not in the allowed operators list: "
-                f"{allowed_ops}.",
-                feature="operators",
-            )
+        return {
+            "dialect": DialectValidator(self._ctx),
+            "schema": schema_validator,
+            "op": op_validator,
+            "pred": pred_validator,
+            "semantic": SemanticValidator(self._ctx),
+        }

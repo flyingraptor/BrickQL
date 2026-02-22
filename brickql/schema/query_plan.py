@@ -2,9 +2,10 @@
 
 The LLM outputs a single JSON object matching the ``QueryPlan`` shape.
 All clause keys are optional; unused keys must be omitted.
-Expression operands and predicate nodes inside ``WHERE``, ``HAVING``,
-``GROUP_BY``, and ``SELECT`` items are represented as ``dict[str, Any]``
-and validated deeply by ``PlanValidator``.
+Expression operands inside ``SELECT`` items, ``GROUP_BY``, ``ORDER BY``,
+and window ``PARTITION BY`` are now typed via the ``Operand`` union.
+Predicate nodes (``WHERE``, ``HAVING``) remain as ``dict[str, Any]``
+and are validated deeply by ``PlanValidator``.
 """
 from __future__ import annotations
 
@@ -12,12 +13,19 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from brickql.schema.operands import (
+    ColumnOperand,
+    FuncOperand,
+    CaseOperand,
+    Operand,
+)
+
 
 class SelectItem(BaseModel):
     """A single item in the SELECT clause.
 
     Attributes:
-        expr: An operand dict (col / value / param / func / case).
+        expr: A typed operand (col / value / param / func / case).
         alias: Optional SQL alias for the expression.
         distinct: If True, emit ``SELECT DISTINCT`` for this item.
         over: Optional window specification.
@@ -25,7 +33,7 @@ class SelectItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    expr: dict[str, Any]
+    expr: Operand
     alias: str | None = None
     distinct: bool = False
     over: WindowSpec | None = None
@@ -70,13 +78,13 @@ class OrderByItem(BaseModel):
     """A single ORDER BY expression.
 
     Attributes:
-        expr: Operand dict to order by.
+        expr: Typed operand to order by.
         direction: Sort direction.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    expr: dict[str, Any]
+    expr: Operand
     direction: Literal["ASC", "DESC"] = "ASC"
 
 
@@ -124,14 +132,14 @@ class WindowSpec(BaseModel):
     """OVER (...) specification for a window function.
 
     Attributes:
-        partition_by: List of operand dicts for PARTITION BY.
+        partition_by: List of typed operands for PARTITION BY.
         order_by: Ordered list of items for the window ORDER BY.
         frame: Optional frame clause.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    partition_by: list[dict[str, Any]] = Field(default_factory=list)
+    partition_by: list[Operand] = Field(default_factory=list)
     order_by: list[OrderByItem] = Field(default_factory=list)
     frame: WindowFrame | None = None
 
@@ -177,7 +185,7 @@ class QueryPlan(BaseModel):
         FROM: The primary table or derived table.
         JOIN: List of relationship-based joins.
         WHERE: Root predicate dict.
-        GROUP_BY: List of grouping operand dicts.
+        GROUP_BY: List of typed grouping operands.
         HAVING: Root predicate dict for aggregate filtering.
         ORDER_BY: List of ordering items.
         LIMIT: Maximum rows (required by default policy).
@@ -192,13 +200,125 @@ class QueryPlan(BaseModel):
     FROM: FromClause | None = None
     JOIN: list[JoinClause] | None = None
     WHERE: dict[str, Any] | None = None
-    GROUP_BY: list[dict[str, Any]] | None = None
+    GROUP_BY: list[Operand] | None = None
     HAVING: dict[str, Any] | None = None
     ORDER_BY: list[OrderByItem] | None = None
     LIMIT: LimitClause | None = None
     OFFSET: OffsetClause | None = None
     SET_OP: SetOpClause | None = None
     CTE: list[CTEClause] | None = None
+
+    # ------------------------------------------------------------------
+    # Domain methods (Item 7 — Anemic Domain Model fix)
+    # ------------------------------------------------------------------
+
+    def collect_table_references(self) -> set[str]:
+        """Collect direct table names referenced in FROM.
+
+        Does not resolve JOIN relationship keys — callers that need
+        JOIN-resolved tables should use :meth:`collect_joined_tables`.
+
+        Returns:
+            Set of table names (may be empty if FROM is absent or uses a
+            subquery rather than a direct table reference).
+        """
+        tables: set[str] = set()
+        if self.FROM and self.FROM.table:
+            tables.add(self.FROM.table)
+        return tables
+
+    def collect_col_refs(self) -> list[str]:
+        """Collect every ``table.column`` reference in this plan.
+
+        Walks SELECT, GROUP BY, ORDER BY, window specs, and recursively
+        through subqueries.  Predicate dicts (WHERE / HAVING) are also
+        walked since they embed operand dicts.
+
+        Returns:
+            List of column reference strings in encounter order.
+        """
+        refs: list[str] = []
+        _collect_col_refs_from_plan(self, refs)
+        return refs
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers for collect_col_refs
+# ---------------------------------------------------------------------------
+
+
+def _collect_from_operand(operand: Operand, refs: list[str]) -> None:
+    """Append column references found inside a typed operand."""
+    if isinstance(operand, ColumnOperand):
+        refs.append(operand.col)
+    elif isinstance(operand, FuncOperand):
+        for arg in operand.args:
+            _collect_from_operand(arg, refs)
+    elif isinstance(operand, CaseOperand):
+        for when in operand.case.when:
+            _collect_from_pred_dict(when.condition, refs)
+            _collect_from_operand(when.then, refs)
+        if operand.case.else_val is not None:
+            _collect_from_operand(operand.case.else_val, refs)
+
+
+def _collect_from_pred_dict(pred: Any, refs: list[str]) -> None:
+    """Append column references found inside a predicate dict."""
+    if isinstance(pred, dict):
+        for v in pred.values():
+            _collect_from_pred_or_operand(v, refs)
+    elif isinstance(pred, list):
+        for item in pred:
+            _collect_from_pred_or_operand(item, refs)
+
+
+def _collect_from_pred_or_operand(node: Any, refs: list[str]) -> None:
+    """Dispatch to operand or predicate walker depending on node type."""
+    if isinstance(node, (ColumnOperand, FuncOperand, CaseOperand)):
+        _collect_from_operand(node, refs)
+    elif isinstance(node, dict):
+        # Could be a predicate dict or a legacy operand dict — handle both.
+        if "col" in node:
+            refs.append(node["col"])
+        elif "func" in node:
+            for arg in node.get("args", []):
+                _collect_from_pred_or_operand(arg, refs)
+        elif "case" in node:
+            _collect_from_pred_dict(node["case"], refs)
+        else:
+            _collect_from_pred_dict(node, refs)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_from_pred_or_operand(item, refs)
+
+
+def _collect_col_refs_from_plan(plan: QueryPlan, refs: list[str]) -> None:
+    """Walk every expression-bearing clause and accumulate column refs."""
+    if plan.SELECT:
+        for item in plan.SELECT:
+            _collect_from_operand(item.expr, refs)
+            if item.over:
+                for pb in item.over.partition_by:
+                    _collect_from_operand(pb, refs)
+                for ob in item.over.order_by:
+                    _collect_from_operand(ob.expr, refs)
+    if plan.WHERE:
+        _collect_from_pred_dict(plan.WHERE, refs)
+    if plan.GROUP_BY:
+        for operand in plan.GROUP_BY:
+            _collect_from_operand(operand, refs)
+    if plan.HAVING:
+        _collect_from_pred_dict(plan.HAVING, refs)
+    if plan.ORDER_BY:
+        for item in plan.ORDER_BY:
+            _collect_from_operand(item.expr, refs)
+    if plan.FROM and plan.FROM.subquery:
+        _collect_col_refs_from_plan(plan.FROM.subquery, refs)
+    if plan.CTE:
+        for cte in plan.CTE:
+            _collect_col_refs_from_plan(cte.query, refs)
+    if plan.SET_OP:
+        _collect_col_refs_from_plan(plan.SET_OP.query, refs)
 
 
 # Resolve forward references created by the recursive QueryPlan type.
@@ -207,3 +327,5 @@ SetOpClause.model_rebuild()
 CTEClause.model_rebuild()
 QueryPlan.model_rebuild()
 SelectItem.model_rebuild()
+WindowSpec.model_rebuild()
+OrderByItem.model_rebuild()

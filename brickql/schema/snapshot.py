@@ -109,6 +109,21 @@ class SchemaSnapshot(BaseModel):
                 return col
         return None
 
+    def get_column_names(self, table_name: str) -> list[str]:
+        """Returns column names for ``table_name``, or ``[]`` if not found.
+
+        Prefer this over ``get_table(name).column_names`` to satisfy the
+        Law of Demeter — callers do not need to handle ``None`` themselves.
+
+        Args:
+            table_name: The table to look up.
+
+        Returns:
+            List of column name strings, empty if the table is unknown.
+        """
+        table = self.get_table(table_name)
+        return table.column_names if table is not None else []
+
     @property
     def table_names(self) -> list[str]:
         """Returns all table names in the snapshot."""

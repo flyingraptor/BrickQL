@@ -86,12 +86,18 @@ def test_unknown_column_raises():
 
 
 def test_invalid_operand_key_raises():
-    plan = QueryPlan(
-        SELECT=[SelectItem(expr={"bad_key": "something"})],
-        FROM=FromClause(table="employees"),
-        LIMIT=LimitClause(value=10),
-    )
-    with pytest.raises(ValidationError):
+    # With typed Operand, Pydantic rejects unknown discriminator keys at
+    # model construction time.  The error may surface as a pydantic
+    # ValidationError (at build time) or a brickql ValidationError (if
+    # validation is run on an already-constructed plan with a bad operand).
+    import pydantic
+
+    with pytest.raises((ValidationError, pydantic.ValidationError)):
+        plan = QueryPlan(
+            SELECT=[SelectItem(expr={"bad_key": "something"})],
+            FROM=FromClause(table="employees"),
+            LIMIT=LimitClause(value=10),
+        )
         _v().validate(plan)
 
 

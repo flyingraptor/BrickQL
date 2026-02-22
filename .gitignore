@@ -48,3 +48,10 @@ brickql_pgdata/
 .env.*
 
 examples/
+
+# Generated Mermaid diagrams
+docs/class-diagram.mmd
+docs/flow-diagram.mmd
+
+# Local refactoring notes
+todo/
