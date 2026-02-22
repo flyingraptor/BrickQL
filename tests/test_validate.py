@@ -498,3 +498,162 @@ def test_deeply_nested_and_or():
         LIMIT=LimitClause(value=10),
     )
     _v().validate(plan)
+
+
+# ---------------------------------------------------------------------------
+# scalar_functions — DialectProfileBuilder.scalar_functions()
+# ---------------------------------------------------------------------------
+
+
+class TestScalarFunctions:
+    def test_scalar_function_added_to_allowlist(self):
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART", "COALESCE")
+            .build()
+        )
+        assert "DATE_PART" in profile.allowed.functions
+        assert "COALESCE" in profile.allowed.functions
+
+    def test_scalar_function_passes_validation(self):
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART")
+            .build()
+        )
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        PlanValidator(SNAPSHOT, profile).validate(plan)
+
+    def test_unknown_scalar_function_rejected(self):
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .build()
+        )
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        with pytest.raises(DialectViolationError):
+            PlanValidator(SNAPSHOT, profile).validate(plan)
+
+    def test_scalar_functions_is_additive_over_aggregates(self):
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART")
+            .build()
+        )
+        assert "COUNT" in profile.allowed.functions
+        assert "DATE_PART" in profile.allowed.functions
+
+    def test_scalar_functions_deduplicates(self):
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART", "DATE_PART")
+            .build()
+        )
+        assert profile.allowed.functions.count("DATE_PART") == 1
+
+
+# ---------------------------------------------------------------------------
+# OperandValidator — ValueOperand/ParamOperand as function args regression
+# ---------------------------------------------------------------------------
+
+
+class TestFuncArgValidation:
+    """ValueOperand and ParamOperand inside FuncOperand args must not raise."""
+
+    def _profile(self) -> DialectProfile:
+        return (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART")
+            .build()
+        )
+
+    def test_value_operand_as_func_arg_is_valid(self):
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        PlanValidator(SNAPSHOT, self._profile()).validate(plan)
+
+    def test_param_operand_as_func_arg_is_valid(self):
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"param": "FIELD"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        PlanValidator(SNAPSHOT, self._profile()).validate(plan)
+
+    def test_nested_func_with_value_arg_in_group_by(self):
+        """Aggregate + scalar in SELECT and scalar in GROUP_BY all validate."""
+        profile = (
+            DialectProfile.builder(ALL_TABLES)
+            .aggregations()
+            .scalar_functions("DATE_PART")
+            .subqueries()
+            .ctes()
+            .build()
+        )
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={"func": "COUNT", "args": [{"col": "employees.employee_id"}]},
+                    alias="cnt",
+                ),
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                ),
+            ],
+            FROM=FromClause(table="employees"),
+            GROUP_BY=[
+                {
+                    "func": "DATE_PART",
+                    "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                }
+            ],
+        )
+        PlanValidator(SNAPSHOT, profile).validate(plan)

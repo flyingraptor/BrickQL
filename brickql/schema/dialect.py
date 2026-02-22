@@ -215,6 +215,21 @@ class DialectProfileBuilder:
                 self._functions.append(fn)
         return self
 
+    def scalar_functions(self, *functions: str) -> "DialectProfileBuilder":
+        """Allow additional scalar (non-aggregate) functions by name.
+
+        Use this to expose backend-specific functions like ``DATE_PART``,
+        ``COALESCE``, ``NULLIF``, etc.  The compiler renders each as a
+        regular call ``FUNC(arg1, arg2, …)`` with comma-separated arguments.
+
+        Args:
+            *functions: Function names to add to the allowlist.
+        """
+        for fn in functions:
+            if fn not in self._functions:
+                self._functions.append(fn)
+        return self
+
     def subqueries(self) -> "DialectProfileBuilder":
         """Enable correlated and uncorrelated subqueries: derived tables,
         EXISTS predicates, and IN subquery."""

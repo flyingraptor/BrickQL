@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass
@@ -89,3 +89,24 @@ class SQLCompiler(ABC):
     @abstractmethod
     def dialect_name(self) -> str:
         """Return the canonical dialect name (``'postgres'`` or ``'sqlite'``)."""
+
+    def build_func_call(
+        self,
+        func_name: str,
+        args: list[Any],
+        build_arg: Callable[[Any], str],
+    ) -> str:
+        """Compile a function call expression.
+
+        Override in a dialect subclass to provide dialect-specific rendering
+        for particular functions (e.g. inlining literal args, adding type
+        casts).  The default renders ``FUNC(arg1, arg2, …)`` by applying
+        ``build_arg`` to each operand.
+
+        Args:
+            func_name: The function name as supplied in the plan (any case).
+            args: Typed ``Operand`` objects from the ``FuncOperand``.
+            build_arg: Callback that compiles a single ``Operand`` to SQL.
+        """
+        args_sql = ", ".join(build_arg(a) for a in args)
+        return f"{func_name.upper()}({args_sql})"

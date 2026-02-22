@@ -110,8 +110,7 @@ class OperandBuilder:
         return quote(col)
 
     def _build_func(self, expr: FuncOperand) -> str:
-        args_sql = ", ".join(self.build(a) for a in expr.args)
-        return f"{expr.func.upper()}({args_sql})"
+        return self._ctx.compiler.build_func_call(expr.func, expr.args, self.build)
 
     def _build_case(self, case_body: CaseBody) -> str:
         parts = ["CASE"]

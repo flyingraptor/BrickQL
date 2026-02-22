@@ -16,6 +16,8 @@ class ColumnInfo(BaseModel):
         name: Column name.
         type: SQL type string (e.g. ``'TEXT'``, ``'INTEGER'``, ``'TIMESTAMP'``).
         nullable: Whether the column can be NULL.
+        description: Optional human-readable explanation of the column's purpose.
+            Included in LLM prompts to improve query decisions.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -23,6 +25,7 @@ class ColumnInfo(BaseModel):
     name: str
     type: str
     nullable: bool = True
+    description: str | None = None
 
 
 class RelationshipInfo(BaseModel):
@@ -55,6 +58,8 @@ class TableInfo(BaseModel):
         name: Table name.
         columns: Ordered list of column metadata.
         relationships: Relationship keys where this table is the left side.
+        description: Optional human-readable explanation of the table's purpose.
+            Included in LLM prompts to improve query decisions.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -62,6 +67,7 @@ class TableInfo(BaseModel):
     name: str
     columns: list[ColumnInfo]
     relationships: list[str] = Field(default_factory=list)
+    description: str | None = None
 
     @property
     def column_names(self) -> list[str]:

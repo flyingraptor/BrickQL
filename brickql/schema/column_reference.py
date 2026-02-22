@@ -38,7 +38,7 @@ class ColumnReference:
         if "." in ref:
             table, column = ref.split(".", 1)
             return cls(table=table, column=column)
-        return cls(table=None, column=column)
+        return cls(table=None, column=ref)
 
     # ------------------------------------------------------------------
     # Validation

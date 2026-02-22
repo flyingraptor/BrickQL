@@ -34,6 +34,8 @@ from brickql.schema.operands import (
     ColumnOperand,
     FuncOperand,
     Operand,
+    ParamOperand,
+    ValueOperand,
     to_operand,
 )
 
@@ -79,7 +81,7 @@ class OperandValidator:
             ValidationError: On structural or schema violation.
             DialectViolationError: On function not in the allowlist.
         """
-        if isinstance(expr, (ColumnOperand, FuncOperand, CaseOperand)):
+        if isinstance(expr, (ColumnOperand, FuncOperand, CaseOperand, ValueOperand, ParamOperand)):
             self._validate_typed(expr)
             return
 

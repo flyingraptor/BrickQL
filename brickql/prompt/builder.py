@@ -250,11 +250,15 @@ class PromptBuilder:
                 {
                     "name": col.name,
                     "type": col.type,
+                    **({"description": col.description} if col.description else {}),
                     **({"param_bound": bound[col.name]} if col.name in bound else {}),
                 }
                 for col in table.columns
             ]
-            summary["tables"].append({"name": table.name, "columns": cols})
+            table_entry: dict = {"name": table.name, "columns": cols}
+            if table.description:
+                table_entry["description"] = table.description
+            summary["tables"].append(table_entry)
         for rel in self._snapshot.relationships:
             summary["relationships"].append(
                 {
