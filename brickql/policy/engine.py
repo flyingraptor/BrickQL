@@ -6,31 +6,31 @@
   appear with ``{"param": "PARAM_NAME"}`` rather than a literal value.  If a
   predicate is missing, the engine can optionally inject it automatically or
   raise :class:`~brickql.errors.MissingParamError`.
-* **Table / column allowlists** – globally or per-table denied columns are
-  blocked before compilation.
+* **Table / column access control** – per-table positive column allowlists
+  (``allowed_columns``) and/or negative blocklists (``denied_columns``) are
+  enforced before compilation.  A globally denied column list is also supported
+  via :attr:`PolicyConfig.denied_columns`.
 * **LIMIT enforcement** – clamps or rejects LIMIT values that exceed the max.
 
 Runtime policy is configured entirely in :class:`PolicyConfig` and
 :class:`TablePolicy`.  The :class:`~brickql.schema.snapshot.SchemaSnapshot`
 remains a pure structural description of the database; it carries no policy.
 
-Example — multi-tenant setup with per-table param names::
+Example — per-role column allowlist (RBAC pattern)::
 
-    policy = PolicyConfig(
+    analyst_policy = PolicyConfig(
         inject_missing_params=True,
         default_limit=100,
         tables={
-            "companies":   TablePolicy(param_bound_columns={"tenant_id": "TENANT"}),
-            "departments": TablePolicy(param_bound_columns={"tenant_id": "TENANT"}),
-            "employees":   TablePolicy(
+            "employees": TablePolicy(
                 param_bound_columns={"tenant_id": "TENANT"},
-                denied_columns=["salary"],
+                allowed_columns=["employee_id", "first_name", "last_name",
+                                 "department_id", "hire_date", "active"],
             ),
-            "projects":    TablePolicy(param_bound_columns={"tenant_id": "TENANT"}),
         },
     )
 
-    compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
+    compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, analyst_policy)
     params = compiled.merge_runtime_params({"TENANT": tenant_id})
     cursor.execute(compiled.sql, params)
 """
@@ -59,11 +59,20 @@ class TablePolicy:
             predicate on ``tenant_id`` to use ``{"param": "TENANT"}`` rather
             than a literal value.  Different tables can use different param
             names — or the same name if the runtime value is shared.
+        allowed_columns: Positive allowlist of column names that may appear in
+            any plan referencing this table.  When non-empty, **only** the
+            listed columns are permitted — any other column is blocked with
+            :class:`~brickql.errors.DisallowedColumnError`.  An empty list
+            (the default) means all columns are allowed (subject to
+            ``denied_columns``).  Useful for RBAC patterns where a role should
+            only see a specific subset of columns.
         denied_columns: Column names that are forbidden in any plan referencing
-            this table (SELECT, WHERE, ORDER BY, …).
+            this table (SELECT, WHERE, ORDER BY, …).  Applied on top of
+            ``allowed_columns`` when both are set.
     """
 
     param_bound_columns: dict[str, str] = field(default_factory=dict)
+    allowed_columns: list[str] = field(default_factory=list)
     denied_columns: list[str] = field(default_factory=list)
 
 
@@ -207,20 +216,39 @@ class PolicyEngine:
         )
 
         per_table_denied = False
+        not_in_allowlist = False
         if table_name:
             tpol = self._config.tables.get(table_name)
-            per_table_denied = tpol is not None and col_name in tpol.denied_columns
+            if tpol is not None:
+                per_table_denied = col_name in tpol.denied_columns
+                if tpol.allowed_columns:
+                    not_in_allowlist = col_name not in tpol.allowed_columns
 
-        if globally_denied or per_table_denied:
+        if globally_denied or per_table_denied or not_in_allowlist:
             if table_name:
-                all_denied = set(self._config.denied_columns_for(table_name))
-                allowed = [
-                    c
-                    for c in self._snapshot.get_column_names(table_name)
-                    if c not in all_denied
-                ]
-                raise DisallowedColumnError(table_name, col_name, allowed)
+                raise DisallowedColumnError(
+                    table_name, col_name, self._effective_allowed_columns(table_name)
+                )
             raise DisallowedColumnError("", col_name, [])
+
+    def _effective_allowed_columns(self, table_name: str) -> list[str]:
+        """Return the columns a plan may reference for *table_name*.
+
+        When the table's :class:`TablePolicy` carries a non-empty
+        ``allowed_columns`` list, that list is the starting set.  Otherwise
+        every column known to the snapshot is the starting set.  The global
+        and per-table ``denied_columns`` are subtracted from the result in
+        both cases.
+        """
+        tpol = self._config.tables.get(table_name)
+        all_denied = set(self._config.denied_columns_for(table_name))
+        if tpol is not None and tpol.allowed_columns:
+            return [c for c in tpol.allowed_columns if c not in all_denied]
+        return [
+            c
+            for c in self._snapshot.get_column_names(table_name)
+            if c not in all_denied
+        ]
 
     # ------------------------------------------------------------------
     # Parameter-bound column enforcement

@@ -223,7 +223,8 @@ profile = (
 ### PolicyConfig and TablePolicy
 
 `PolicyConfig` controls the overall request policy. `TablePolicy` configures
-per-table rules — each table can have its own param-bound columns and denied columns.
+per-table rules — each table can have its own param-bound columns, a positive
+column allowlist, and/or a denied column list.
 
 ```python
 from brickql import PolicyConfig, TablePolicy
@@ -242,6 +243,33 @@ policy = PolicyConfig(
     },
 )
 ```
+
+#### Column allowlist — RBAC pattern
+
+`allowed_columns` is a **positive allowlist**: when non-empty, only the listed
+columns may appear in any plan referencing that table. This maps directly to
+RBAC grant patterns where a role should see only a specific subset of columns,
+without having to enumerate every other column in a blocklist.
+
+```python
+analyst_policy = PolicyConfig(
+    inject_missing_params=True,
+    tables={
+        "employees": TablePolicy(
+            param_bound_columns={"tenant_id": "TENANT"},
+            allowed_columns=[
+                "employee_id", "first_name", "last_name",
+                "department_id", "hire_date", "active",
+            ],
+        ),
+    },
+)
+```
+
+`denied_columns` (per-table or global) is subtracted from `allowed_columns`
+when both are set, so you can always enforce a hard blocklist on top. An empty
+`allowed_columns` (the default) means all snapshot columns are permitted,
+subject only to `denied_columns`.
 
 Different tables can use **different param names**:
 

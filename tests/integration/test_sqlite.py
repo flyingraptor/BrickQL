@@ -13,6 +13,7 @@ import sqlite3
 import pytest
 
 import brickql
+from brickql.errors import DisallowedColumnError
 from brickql.policy.engine import PolicyConfig, TablePolicy
 from brickql.schema.dialect import DialectProfile
 from brickql.schema.query_plan import (
@@ -177,6 +178,21 @@ def _run(conn, plan: QueryPlan, level: int, runtime: dict | None = None) -> list
     if runtime:
         effective_runtime.update(runtime)
     params = compiled.merge_runtime_params(effective_runtime)
+    cur = conn.execute(compiled.sql, params)
+    return cur.fetchall()
+
+
+def _run_with_policy(
+    conn,
+    plan: QueryPlan,
+    level: int,
+    policy: PolicyConfig,
+    runtime: dict | None = None,
+) -> list:
+    plan_json = plan.model_dump_json(exclude_none=True)
+    dialect = _build_dialect(level)
+    compiled = brickql.validate_and_compile(plan_json, SNAPSHOT, dialect, policy)
+    params = compiled.merge_runtime_params(runtime or {})
     cur = conn.execute(compiled.sql, params)
     return cur.fetchall()
 
@@ -430,3 +446,73 @@ def test_p6_union_all_active_inactive(db):
     )
     rows = _run(db, plan, 6, {"TENANT": TENANT})
     assert len(rows) == 5
+
+
+# ---------------------------------------------------------------------------
+# Policy — allowed_columns (column allowlist / RBAC pattern)
+# ---------------------------------------------------------------------------
+
+_ANALYST_POLICY = PolicyConfig(
+    inject_missing_params=True,
+    default_limit=0,
+    tables={
+        "employees": TablePolicy(
+            param_bound_columns={"tenant_id": "TENANT"},
+            allowed_columns=[
+                "employee_id", "tenant_id", "first_name", "last_name",
+                "department_id", "hire_date", "active",
+            ],
+        ),
+    },
+)
+
+
+@pytest.mark.integration
+def test_policy_allowed_columns_permits_allowed_query(db):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.first_name"}, alias="first"),
+            SelectItem(expr={"col": "employees.last_name"}, alias="last"),
+            SelectItem(expr={"col": "employees.hire_date"}, alias="hired"),
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run_with_policy(db, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    assert len(rows) == 5
+    assert all("hired" in dict(r) for r in rows)
+
+
+@pytest.mark.integration
+def test_policy_allowed_columns_blocks_unlisted_column(db):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.first_name"}),
+            SelectItem(expr={"col": "employees.salary"}),  # not in analyst allowlist
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _run_with_policy(db, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    err = exc_info.value
+    assert err.details["column"] == "salary"
+    assert err.details["table"] == "employees"
+    assert "salary" not in err.details["allowed_columns"]
+
+
+@pytest.mark.integration
+def test_policy_allowed_columns_error_details_list_allowlist(db):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.notes"})],  # not in allowlist
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _run_with_policy(db, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    allowed = set(exc_info.value.details["allowed_columns"])
+    assert allowed == {"employee_id", "tenant_id", "first_name", "last_name",
+                       "department_id", "hire_date", "active"}

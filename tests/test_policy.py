@@ -231,3 +231,109 @@ def test_no_default_limit_injected_when_zero():
     )
     result = _engine(default_limit=0).apply(plan)
     assert result.LIMIT is None
+
+
+# ---------------------------------------------------------------------------
+# allowed_columns — positive column allowlist
+# ---------------------------------------------------------------------------
+
+
+def _allowlist_engine(allowed: list[str]) -> PolicyEngine:
+    policy = PolicyConfig(
+        inject_missing_params=False,
+        tables={
+            "employees": TablePolicy(allowed_columns=allowed),
+        },
+    )
+    return PolicyEngine(policy, SNAPSHOT, DIALECT)
+
+
+def test_allowed_columns_passes_listed_column():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.first_name"})],
+        FROM=FromClause(table="employees"),
+        LIMIT=LimitClause(value=10),
+    )
+    _allowlist_engine(["first_name", "last_name"]).apply(plan)  # must not raise
+
+
+def test_allowed_columns_blocks_unlisted_column():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.salary"})],
+        FROM=FromClause(table="employees"),
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _allowlist_engine(["first_name", "last_name"]).apply(plan)
+    assert exc_info.value.details["column"] == "salary"
+    assert exc_info.value.details["table"] == "employees"
+
+
+def test_allowed_columns_error_details_lists_allowlist():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.salary"})],
+        FROM=FromClause(table="employees"),
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _allowlist_engine(["first_name", "last_name"]).apply(plan)
+    assert set(exc_info.value.details["allowed_columns"]) == {"first_name", "last_name"}
+
+
+def test_empty_allowed_columns_permits_all_schema_columns():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.salary"})],
+        FROM=FromClause(table="employees"),
+        LIMIT=LimitClause(value=10),
+    )
+    _allowlist_engine([]).apply(plan)  # empty list = no restriction, must not raise
+
+
+def test_allowed_columns_does_not_affect_other_tables():
+    policy = PolicyConfig(
+        inject_missing_params=False,
+        tables={
+            "employees": TablePolicy(allowed_columns=["employee_id"]),
+        },
+    )
+    engine = PolicyEngine(policy, SNAPSHOT, DIALECT)
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "skills.name"})],
+        FROM=FromClause(table="skills"),
+        LIMIT=LimitClause(value=10),
+    )
+    engine.apply(plan)  # skills has no allowlist restriction, must not raise
+
+
+def test_allowed_columns_blocked_in_where_clause():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.salary"}, {"value": 50000}]},
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _allowlist_engine(["employee_id", "first_name"]).apply(plan)
+    assert exc_info.value.details["column"] == "salary"
+
+
+def test_denied_columns_subtracted_from_allowlist_in_error_details():
+    policy = PolicyConfig(
+        inject_missing_params=False,
+        tables={
+            "employees": TablePolicy(
+                allowed_columns=["first_name", "last_name", "salary"],
+                denied_columns=["salary"],
+            ),
+        },
+    )
+    engine = PolicyEngine(policy, SNAPSHOT, DIALECT)
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.salary"})],
+        FROM=FromClause(table="employees"),
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        engine.apply(plan)
+    assert "salary" not in exc_info.value.details["allowed_columns"]
+    assert set(exc_info.value.details["allowed_columns"]) == {"first_name", "last_name"}
