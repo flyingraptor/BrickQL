@@ -1,4 +1,5 @@
 """Shared pytest fixtures for brickQL unit and integration tests."""
+
 from __future__ import annotations
 
 import pytest
@@ -8,9 +9,14 @@ from brickql.schema.snapshot import SchemaSnapshot
 from tests.fixtures import load_schema_snapshot
 
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 
 
@@ -45,11 +51,7 @@ def dialect_pg_agg(snapshot: SchemaSnapshot) -> DialectProfile:
 @pytest.fixture(scope="session")
 def dialect_pg_subq(snapshot: SchemaSnapshot) -> DialectProfile:
     return (
-        DialectProfile.builder(ALL_TABLES, "postgres")
-        .joins()
-        .aggregations()
-        .subqueries()
-        .build()
+        DialectProfile.builder(ALL_TABLES, "postgres").joins().aggregations().subqueries().build()
     )
 
 

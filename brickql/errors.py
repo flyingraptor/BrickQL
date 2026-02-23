@@ -3,6 +3,7 @@
 All public errors inherit from brickQLError so callers can catch the base
 class for any brickQL-specific failure.
 """
+
 from __future__ import annotations
 
 from typing import Any

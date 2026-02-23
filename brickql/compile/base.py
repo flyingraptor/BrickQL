@@ -5,11 +5,13 @@ The Template Method pattern (GoF) is used:
 - ``PostgresCompiler`` and ``SQLiteCompiler`` override dialect-specific steps
   (parameter placeholder style, ILIKE support, quoting).
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -28,9 +30,7 @@ class CompiledSQL:
     params: dict[str, Any]
     dialect: str
 
-    def merge_runtime_params(
-        self, runtime: dict[str, Any]
-    ) -> dict[str, Any]:
+    def merge_runtime_params(self, runtime: dict[str, Any]) -> dict[str, Any]:
         """Return a merged param dict ready for query execution.
 
         Args:

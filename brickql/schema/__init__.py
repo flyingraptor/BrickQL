@@ -1,4 +1,5 @@
 """brickQL schema models: QueryPlan, SchemaSnapshot, DialectProfile."""
+
 from brickql.schema.dialect import AllowedFeatures, DialectProfile
 from brickql.schema.query_plan import (
     CTEClause,
@@ -22,20 +23,20 @@ from brickql.schema.snapshot import (
 
 __all__ = [
     "AllowedFeatures",
-    "DialectProfile",
     "CTEClause",
+    "ColumnInfo",
+    "DialectProfile",
     "FromClause",
     "JoinClause",
     "LimitClause",
     "OffsetClause",
     "OrderByItem",
     "QueryPlan",
-    "SelectItem",
-    "SetOpClause",
-    "WindowFrame",
-    "WindowSpec",
-    "ColumnInfo",
     "RelationshipInfo",
     "SchemaSnapshot",
+    "SelectItem",
+    "SetOpClause",
     "TableInfo",
+    "WindowFrame",
+    "WindowSpec",
 ]

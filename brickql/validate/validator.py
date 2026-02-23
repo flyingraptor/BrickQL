@@ -21,9 +21,10 @@ Item 6 — Data Clumps fix: ``(snapshot, dialect)`` is packaged into the
 :class:`~brickql.schema.context.ValidationContext` value object and
 threaded to every sub-validator.
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from brickql.errors import DialectViolationError, ValidationError
 from brickql.schema.context import ValidationContext
@@ -60,7 +61,7 @@ class PlanValidator:
         self,
         snapshot: SchemaSnapshot,
         dialect: DialectProfile,
-        sub_validator_factory: Callable[[], "PlanValidator"] | None = None,
+        sub_validator_factory: Callable[[], PlanValidator] | None = None,
     ) -> None:
         self._ctx = ValidationContext(snapshot=snapshot, dialect=dialect)
         self._sub_validator_factory = sub_validator_factory or (
@@ -73,9 +74,7 @@ class PlanValidator:
     # Public API
     # ------------------------------------------------------------------
 
-    def validate(
-        self, plan: QueryPlan, cte_names: frozenset[str] | None = None
-    ) -> None:
+    def validate(self, plan: QueryPlan, cte_names: frozenset[str] | None = None) -> None:
         """Validate ``plan`` and raise on the first violation found.
 
         Args:
@@ -131,9 +130,7 @@ class PlanValidator:
                 self._cte_names = self._cte_names | {frm.alias}
                 sv["schema"].cte_names = self._cte_names
                 sv["op"].cte_names = self._cte_names
-            self._sub_validator_factory().validate(
-                frm.subquery, cte_names=self._cte_names
-            )
+            self._sub_validator_factory().validate(frm.subquery, cte_names=self._cte_names)
         else:
             raise ValidationError(
                 "FROM clause must specify either 'table' or 'subquery'.",

@@ -29,6 +29,7 @@ New dialect compilers can be registered via::
 After registration, ``validate_and_compile`` picks it up automatically for
 any ``DialectProfile`` with ``target="mysql"``.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,7 +40,6 @@ from brickql.compile.postgres import PostgresCompiler
 from brickql.compile.registry import CompilerFactory
 from brickql.compile.sqlite import SQLiteCompiler
 from brickql.errors import (
-    brickQLError,
     CompilationError,
     DialectViolationError,
     DisallowedColumnError,
@@ -50,10 +50,12 @@ from brickql.errors import (
     ProfileConfigError,
     SchemaError,
     ValidationError,
+    brickQLError,
 )
 from brickql.policy.engine import PolicyConfig, PolicyEngine, TablePolicy
 from brickql.prompt.builder import PromptBuilder, PromptComponents
 from brickql.schema.context import ValidationContext
+from brickql.schema.converters import schema_from_sqlalchemy
 from brickql.schema.dialect import AllowedFeatures, DialectProfile, DialectProfileBuilder
 from brickql.schema.operands import (
     CaseOperand,
@@ -64,7 +66,6 @@ from brickql.schema.operands import (
     ValueOperand,
 )
 from brickql.schema.query_plan import QueryPlan
-from brickql.schema.converters import schema_from_sqlalchemy
 from brickql.schema.snapshot import (
     ColumnInfo,
     RelationshipInfo,
@@ -176,9 +177,7 @@ def validate_and_compile(
     try:
         plan = QueryPlan.model_validate(raw)
     except Exception as exc:
-        raise ParseError(
-            f"QueryPlan structure is invalid: {exc}", raw=plan_json
-        ) from exc
+        raise ParseError(f"QueryPlan structure is invalid: {exc}", raw=plan_json) from exc
 
     # 2. Validate
     PlanValidator(snapshot, dialect).validate(plan)

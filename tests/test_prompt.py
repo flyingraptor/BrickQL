@@ -1,4 +1,5 @@
 """Unit tests for PromptBuilder."""
+
 from __future__ import annotations
 
 import json
@@ -11,19 +12,24 @@ from tests.fixtures import load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 DIALECT = DialectProfile.builder(ALL_TABLES).build()
 
 _TENANT = TablePolicy(param_bound_columns={"tenant_id": "TENANT"})
 POLICY = PolicyConfig(
     tables={
-        "companies":   _TENANT,
+        "companies": _TENANT,
         "departments": _TENANT,
-        "employees":   _TENANT,
-        "projects":    _TENANT,
+        "employees": _TENANT,
+        "projects": _TENANT,
     }
 )
 

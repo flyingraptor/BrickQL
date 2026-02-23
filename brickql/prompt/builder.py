@@ -9,6 +9,7 @@ The LLM receives three structured inputs:
 The library does NOT call the LLM; callers use the returned strings with
 their own model SDK.
 """
+
 from __future__ import annotations
 
 import json
@@ -240,11 +241,7 @@ class PromptBuilder:
         """
         summary: dict = {"tables": [], "relationships": []}
         for table in self._snapshot.tables:
-            tpol = (
-                self._policy.tables.get(table.name)
-                if self._policy
-                else None
-            )
+            tpol = self._policy.tables.get(table.name) if self._policy else None
             bound = tpol.param_bound_columns if tpol else {}
             cols = [
                 {
@@ -263,10 +260,7 @@ class PromptBuilder:
             summary["relationships"].append(
                 {
                     "key": rel.key,
-                    "join": (
-                        f"{rel.from_table}.{rel.from_col}"
-                        f" = {rel.to_table}.{rel.to_col}"
-                    ),
+                    "join": (f"{rel.from_table}.{rel.from_col} = {rel.to_table}.{rel.to_col}"),
                 }
             )
         return json.dumps(summary, indent=2)

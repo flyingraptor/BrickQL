@@ -4,6 +4,7 @@ Packages the ``(compiler, snapshot)`` data clump that was repeated across
 ``QueryBuilder`` and all clause-level sub-builders into a single cohesive
 object.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

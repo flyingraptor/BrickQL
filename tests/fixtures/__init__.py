@@ -1,4 +1,5 @@
 """Test fixtures: sample schema DDL and SchemaSnapshot JSON."""
+
 from __future__ import annotations
 
 import json

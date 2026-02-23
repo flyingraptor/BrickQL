@@ -57,7 +57,7 @@ test-integration-postgres:  ## Run PostgreSQL integration tests (starts and stop
 		$(PG_IMAGE)
 	@echo "Waiting for Postgres to be ready..."
 	@until docker exec $(PG_CONTAINER) pg_isready -U brickql -d brickql -q; do sleep 1; done
-	brickQL_PG_DSN="$(PG_DSN)" \
+	BRICKQL_PG_DSN="$(PG_DSN)" \
 		$(PYTEST) tests/integration/test_postgres.py -v -m postgres; \
 	EXIT=$$?; \
 	docker stop $(PG_CONTAINER); \

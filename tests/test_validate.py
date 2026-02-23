@@ -1,4 +1,5 @@
 """Unit tests for PlanValidator."""
+
 from __future__ import annotations
 
 import pytest
@@ -16,7 +17,6 @@ from brickql.schema.query_plan import (
     FromClause,
     JoinClause,
     LimitClause,
-    OrderByItem,
     QueryPlan,
     SelectItem,
     SetOpClause,
@@ -27,9 +27,14 @@ from tests.fixtures import load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 
 
@@ -191,11 +196,13 @@ def test_enum_like_text_column():
     plan = QueryPlan(
         SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
         FROM=FromClause(table="employees"),
-        WHERE={"IN": [
-            {"col": "employees.employment_type"},
-            {"value": "full_time"},
-            {"value": "part_time"},
-        ]},
+        WHERE={
+            "IN": [
+                {"col": "employees.employment_type"},
+                {"value": "full_time"},
+                {"value": "part_time"},
+            ]
+        },
         LIMIT=LimitClause(value=10),
     )
     _v().validate(plan)
@@ -340,10 +347,12 @@ def test_having_requires_group_by():
     plan = QueryPlan(
         SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
         FROM=FromClause(table="employees"),
-        HAVING={"GT": [
-            {"func": "COUNT", "args": [{"col": "employees.employee_id"}]},
-            {"value": 1},
-        ]},
+        HAVING={
+            "GT": [
+                {"func": "COUNT", "args": [{"col": "employees.employee_id"}]},
+                {"value": 1},
+            ]
+        },
         LIMIT=LimitClause(value=10),
     )
     with pytest.raises(ValidationError):
@@ -434,32 +443,17 @@ def test_builder_empty_tables_raises():
 
 
 def test_builder_valid_window_with_aggregations():
-    profile = (
-        DialectProfile.builder(ALL_TABLES)
-        .aggregations()
-        .window_functions()
-        .build()
-    )
+    profile = DialectProfile.builder(ALL_TABLES).aggregations().window_functions().build()
     assert profile.allowed.allow_window_functions is True
 
 
 def test_builder_valid_ctes_with_subqueries():
-    profile = (
-        DialectProfile.builder(ALL_TABLES)
-        .subqueries()
-        .ctes()
-        .build()
-    )
+    profile = DialectProfile.builder(ALL_TABLES).subqueries().ctes().build()
     assert profile.allowed.allow_cte is True
 
 
 def test_builder_features_are_independent():
-    profile = (
-        DialectProfile.builder(ALL_TABLES)
-        .joins()
-        .set_operations()
-        .build()
-    )
+    profile = DialectProfile.builder(ALL_TABLES).joins().set_operations().build()
     assert profile.allowed.allow_set_operations is True
     assert not profile.allowed.allow_cte
     assert not profile.allowed.allow_window_functions
@@ -487,7 +481,12 @@ def test_deeply_nested_and_or():
                         {"EQ": [{"col": "employees.employment_type"}, {"value": "full_time"}]},
                         {
                             "AND": [
-                                {"EQ": [{"col": "employees.employment_type"}, {"value": "contractor"}]},
+                                {
+                                    "EQ": [
+                                        {"col": "employees.employment_type"},
+                                        {"value": "contractor"},
+                                    ]
+                                },
                                 {"IS_NOT_NULL": {"col": "employees.salary"}},
                             ]
                         },
@@ -518,10 +517,7 @@ class TestScalarFunctions:
 
     def test_scalar_function_passes_validation(self):
         profile = (
-            DialectProfile.builder(ALL_TABLES)
-            .aggregations()
-            .scalar_functions("DATE_PART")
-            .build()
+            DialectProfile.builder(ALL_TABLES).aggregations().scalar_functions("DATE_PART").build()
         )
         plan = QueryPlan(
             SELECT=[
@@ -538,11 +534,7 @@ class TestScalarFunctions:
         PlanValidator(SNAPSHOT, profile).validate(plan)
 
     def test_unknown_scalar_function_rejected(self):
-        profile = (
-            DialectProfile.builder(ALL_TABLES)
-            .aggregations()
-            .build()
-        )
+        profile = DialectProfile.builder(ALL_TABLES).aggregations().build()
         plan = QueryPlan(
             SELECT=[
                 SelectItem(
@@ -560,10 +552,7 @@ class TestScalarFunctions:
 
     def test_scalar_functions_is_additive_over_aggregates(self):
         profile = (
-            DialectProfile.builder(ALL_TABLES)
-            .aggregations()
-            .scalar_functions("DATE_PART")
-            .build()
+            DialectProfile.builder(ALL_TABLES).aggregations().scalar_functions("DATE_PART").build()
         )
         assert "COUNT" in profile.allowed.functions
         assert "DATE_PART" in profile.allowed.functions
@@ -588,10 +577,7 @@ class TestFuncArgValidation:
 
     def _profile(self) -> DialectProfile:
         return (
-            DialectProfile.builder(ALL_TABLES)
-            .aggregations()
-            .scalar_functions("DATE_PART")
-            .build()
+            DialectProfile.builder(ALL_TABLES).aggregations().scalar_functions("DATE_PART").build()
         )
 
     def test_value_operand_as_func_arg_is_valid(self):

@@ -31,9 +31,10 @@ The ``subquery_factory`` parameter lets callers inject a custom
 :class:`QueryBuilder` factory for testing or specialisation, replacing the
 previous hard-coded ``QueryBuilder(compiler, snapshot)`` self-instantiation.
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from brickql.compile.base import CompiledSQL, SQLCompiler
 from brickql.compile.clause_builders import (
@@ -70,12 +71,10 @@ class QueryBuilder:
         self,
         compiler: SQLCompiler,
         snapshot: SchemaSnapshot,
-        subquery_factory: Callable[[], "QueryBuilder"] | None = None,
+        subquery_factory: Callable[[], QueryBuilder] | None = None,
     ) -> None:
         self._ctx = CompilationContext(compiler=compiler, snapshot=snapshot)
-        self._subquery_factory = subquery_factory or (
-            lambda: QueryBuilder(compiler, snapshot)
-        )
+        self._subquery_factory = subquery_factory or (lambda: QueryBuilder(compiler, snapshot))
 
     # ------------------------------------------------------------------
     # Public API
@@ -158,9 +157,7 @@ class QueryBuilder:
             parts.append(f"WHERE {sub_builders['pred'].build(plan.WHERE)}")
 
         if plan.GROUP_BY:
-            exprs = ", ".join(
-                sub_builders["op"].build(e) for e in plan.GROUP_BY
-            )
+            exprs = ", ".join(sub_builders["op"].build(e) for e in plan.GROUP_BY)
             parts.append(f"GROUP BY {exprs}")
 
         if plan.HAVING:
@@ -168,8 +165,7 @@ class QueryBuilder:
 
         if plan.ORDER_BY:
             order_parts = [
-                f"{sub_builders['op'].build(o.expr)} {o.direction}"
-                for o in plan.ORDER_BY
+                f"{sub_builders['op'].build(o.expr)} {o.direction}" for o in plan.ORDER_BY
             ]
             parts.append(f"ORDER BY {', '.join(order_parts)}")
 

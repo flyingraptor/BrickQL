@@ -3,6 +3,7 @@
 Checks that every table and column referenced in the plan actually exists
 in the ``SchemaSnapshot``, and that JOINs use valid relationship keys.
 """
+
 from __future__ import annotations
 
 from brickql.errors import InvalidJoinRelError, SchemaError, ValidationError

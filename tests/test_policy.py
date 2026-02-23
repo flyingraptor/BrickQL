@@ -1,4 +1,5 @@
 """Unit tests for PolicyEngine."""
+
 from __future__ import annotations
 
 import pytest
@@ -16,18 +17,23 @@ from tests.fixtures import load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 DIALECT = DialectProfile.builder(ALL_TABLES).build()
 
 _TENANT = TablePolicy(param_bound_columns={"tenant_id": "TENANT"})
 TENANT_TABLES = {
-    "companies":   _TENANT,
+    "companies": _TENANT,
     "departments": _TENANT,
-    "employees":   _TENANT,
-    "projects":    _TENANT,
+    "employees": _TENANT,
+    "projects": _TENANT,
 }
 
 
@@ -64,9 +70,7 @@ def test_missing_tenant_injected_into_empty_where():
 
 
 def test_missing_tenant_injected_alongside_existing_where():
-    plan = _emp_plan(
-        where={"EQ": [{"col": "employees.employment_type"}, {"value": "full_time"}]}
-    )
+    plan = _emp_plan(where={"EQ": [{"col": "employees.employment_type"}, {"value": "full_time"}]})
     result = _engine(inject=True).apply(plan)
     assert "AND" in result.WHERE
 
@@ -75,7 +79,7 @@ def test_existing_tenant_param_not_duplicated():
     where = {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]}
     plan = _emp_plan(where=where)
     result = _engine(inject=True).apply(plan)
-    assert result.WHERE == where
+    assert where == result.WHERE
 
 
 def test_missing_param_raises_when_injection_disabled():
@@ -110,7 +114,7 @@ def test_different_param_names_per_table():
         inject_missing_params=True,
         tables={
             "companies": TablePolicy(param_bound_columns={"tenant_id": "COMPANY_TENANT"}),
-            "projects":  TablePolicy(param_bound_columns={"tenant_id": "PROJECT_TENANT"}),
+            "projects": TablePolicy(param_bound_columns={"tenant_id": "PROJECT_TENANT"}),
         },
     )
     engine = PolicyEngine(policy, SNAPSHOT, DIALECT)
@@ -121,9 +125,7 @@ def test_different_param_names_per_table():
         LIMIT=LimitClause(value=5),
     )
     result = engine.apply(companies_plan)
-    assert result.WHERE == {
-        "EQ": [{"col": "companies.tenant_id"}, {"param": "COMPANY_TENANT"}]
-    }
+    assert result.WHERE == {"EQ": [{"col": "companies.tenant_id"}, {"param": "COMPANY_TENANT"}]}
 
 
 def test_multiple_param_bound_columns_in_one_table():

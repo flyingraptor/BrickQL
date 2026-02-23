@@ -7,7 +7,6 @@ from sqlalchemy import (
     Boolean,
     Column,
     Date,
-    ForeignKey,
     Integer,
     MetaData,
     String,
@@ -22,7 +21,6 @@ from brickql.schema.converters import (
     schema_from_sqlalchemy,
 )
 from brickql.schema.snapshot import SchemaSnapshot
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -466,9 +464,7 @@ class TestFixtureParity:
                 f"to_table '{rel.to_table}' not found for key '{rel.key}'"
             )
 
-    def test_every_relationship_key_in_table_relationships(
-        self, snapshot: SchemaSnapshot
-    ) -> None:
+    def test_every_relationship_key_in_table_relationships(self, snapshot: SchemaSnapshot) -> None:
         for rel in snapshot.relationships:
             from_table = snapshot.get_table(rel.from_table)
             assert from_table is not None

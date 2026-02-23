@@ -4,6 +4,7 @@ Replaces scattered ``col.split(".", 1)`` pattern-matching with a single
 object that owns both the parsing and schema-validation logic (Feature Envy
 fix for ``validator.py``, ``engine.py``, and ``builder.py``).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,7 +27,7 @@ class ColumnReference:
     # ------------------------------------------------------------------
 
     @classmethod
-    def parse(cls, ref: str) -> "ColumnReference":
+    def parse(cls, ref: str) -> ColumnReference:
         """Parse a ``"table.column"`` or bare ``"column"`` string.
 
         Args:
@@ -46,7 +47,7 @@ class ColumnReference:
 
     def validate_against(
         self,
-        snapshot: "SchemaSnapshot",  # type: ignore[name-defined]  # noqa: F821
+        snapshot: SchemaSnapshot,  # type: ignore[name-defined]  # noqa: F821
         cte_names: frozenset[str] = frozenset(),
     ) -> None:
         """Raise :class:`~brickql.errors.SchemaError` if invalid.

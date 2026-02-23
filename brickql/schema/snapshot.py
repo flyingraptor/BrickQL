@@ -4,6 +4,7 @@ The SchemaSnapshot describes the subset of the database schema that the LLM
 planner is allowed to reference.  It is produced by the caller (not brickQL
 itself) and injected into prompts and validation.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -1,9 +1,10 @@
 """Integration tests: compile → execute against a real PostgreSQL instance.
 
-Uses brickQL_PG_DSN (e.g. from Makefile when running make test-integration-postgres).
+Uses BRICKQL_PG_DSN (e.g. from Makefile when running make test-integration-postgres).
 Skips all tests if the env var is unset or connection fails.
 Mirrors the SQLite integration tests for the same capability levels.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,9 +38,14 @@ pytest.importorskip("psycopg", reason="psycopg required for Postgres integration
 
 SNAPSHOT = load_schema_snapshot()
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 TENANT = "tenant_acme"
 OTHER = "other_corp"
@@ -58,9 +64,9 @@ POLICY = PolicyConfig(
 
 
 def _get_pg_connection():
-    dsn = os.environ.get("brickQL_PG_DSN")
+    dsn = os.environ.get("BRICKQL_PG_DSN")
     if not dsn:
-        pytest.skip("brickQL_PG_DSN not set")
+        pytest.skip("BRICKQL_PG_DSN not set")
     try:
         return psycopg.connect(dsn)
     except Exception as e:
@@ -79,7 +85,16 @@ def pg_conn():
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::timestamptz)
                ON CONFLICT (company_id) DO NOTHING""",
             [
-                (1, TENANT, "Acme Corp", "Technology", 2010, True, json.dumps({"size": "medium"}), "2025-01-01T00:00:00"),
+                (
+                    1,
+                    TENANT,
+                    "Acme Corp",
+                    "Technology",
+                    2010,
+                    True,
+                    json.dumps({"size": "medium"}),
+                    "2025-01-01T00:00:00",
+                ),
                 (2, OTHER, "Beta LLC", "Finance", 2015, True, None, "2025-01-01T00:00:00"),
             ],
         )
@@ -97,18 +112,131 @@ def pg_conn():
                email, phone, employment_type, salary, hire_date, birth_date, active, remote, manager_id, notes)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (employee_id) DO NOTHING""",
             [
-                (4, TENANT, 1, 3, "Diana", "Prince", "D", "diana@acme.com", "+4567", "full_time", 120000.0, "2018-06-01", "1988-08-30", True, False, None, "Director"),
-                (1, TENANT, 1, 1, "Alice", "Smith", None, "alice@acme.com", "+1234", "full_time", 95000.0, "2020-03-15", "1990-05-20", True, False, 4, "Senior engineer"),
-                (2, TENANT, 1, 1, "Bob", "Jones", "Robert", "bob@acme.com", None, "part_time", 45000.0, "2021-07-01", None, True, True, 4, None),
-                (3, TENANT, 1, 2, "Charlie", "Brown", None, "charlie@acme.com", "+3456", "contractor", None, "2022-01-10", "1985-11-11", True, False, None, ""),
-                (5, TENANT, 1, None, "Eve", "Foster", None, "eve@acme.com", None, "contractor", None, "2023-09-01", None, False, True, None, None),
-                (6, OTHER, 2, None, "Frank", "Miller", None, "frank@beta.com", None, "full_time", 80000.0, "2019-04-15", None, True, False, None, None),
+                (
+                    4,
+                    TENANT,
+                    1,
+                    3,
+                    "Diana",
+                    "Prince",
+                    "D",
+                    "diana@acme.com",
+                    "+4567",
+                    "full_time",
+                    120000.0,
+                    "2018-06-01",
+                    "1988-08-30",
+                    True,
+                    False,
+                    None,
+                    "Director",
+                ),
+                (
+                    1,
+                    TENANT,
+                    1,
+                    1,
+                    "Alice",
+                    "Smith",
+                    None,
+                    "alice@acme.com",
+                    "+1234",
+                    "full_time",
+                    95000.0,
+                    "2020-03-15",
+                    "1990-05-20",
+                    True,
+                    False,
+                    4,
+                    "Senior engineer",
+                ),
+                (
+                    2,
+                    TENANT,
+                    1,
+                    1,
+                    "Bob",
+                    "Jones",
+                    "Robert",
+                    "bob@acme.com",
+                    None,
+                    "part_time",
+                    45000.0,
+                    "2021-07-01",
+                    None,
+                    True,
+                    True,
+                    4,
+                    None,
+                ),
+                (
+                    3,
+                    TENANT,
+                    1,
+                    2,
+                    "Charlie",
+                    "Brown",
+                    None,
+                    "charlie@acme.com",
+                    "+3456",
+                    "contractor",
+                    None,
+                    "2022-01-10",
+                    "1985-11-11",
+                    True,
+                    False,
+                    None,
+                    "",
+                ),
+                (
+                    5,
+                    TENANT,
+                    1,
+                    None,
+                    "Eve",
+                    "Foster",
+                    None,
+                    "eve@acme.com",
+                    None,
+                    "contractor",
+                    None,
+                    "2023-09-01",
+                    None,
+                    False,
+                    True,
+                    None,
+                    None,
+                ),
+                (
+                    6,
+                    OTHER,
+                    2,
+                    None,
+                    "Frank",
+                    "Miller",
+                    None,
+                    "frank@beta.com",
+                    None,
+                    "full_time",
+                    80000.0,
+                    "2019-04-15",
+                    None,
+                    True,
+                    False,
+                    None,
+                    None,
+                ),
             ],
         )
         cur.executemany(
             """INSERT INTO skills (skill_id, name, category) VALUES (%s, %s, %s) ON CONFLICT (skill_id) DO NOTHING""",
-            [(1, "Python", "programming"), (2, "JavaScript", "programming"), (3, "SQL", "programming"),
-            (4, "Leadership", "management"), (5, "Communication", "soft_skill")],
+            [
+                (1, "Python", "programming"),
+                (2, "JavaScript", "programming"),
+                (3, "SQL", "programming"),
+                (4, "Leadership", "management"),
+                (5, "Communication", "soft_skill"),
+            ],
         )
         cur.executemany(
             """INSERT INTO employee_skills (employee_id, skill_id, proficiency) VALUES (%s, %s, %s)
@@ -131,8 +259,13 @@ def pg_conn():
         )
         cur.executemany(
             """INSERT INTO salary_history (employee_id, salary, effective_date, reason) VALUES (%s, %s, %s, %s)""",
-            [(1, 85000.0, "2020-03-15", "initial"), (2, 95000.0, "2022-01-01", "raise"), (3, 45000.0, "2021-07-01", "initial"),
-             (4, 110000.0, "2018-06-01", "initial"), (4, 120000.0, "2021-01-01", "raise")],
+            [
+                (1, 85000.0, "2020-03-15", "initial"),
+                (2, 95000.0, "2022-01-01", "raise"),
+                (3, 45000.0, "2021-07-01", "initial"),
+                (4, 110000.0, "2018-06-01", "initial"),
+                (4, 120000.0, "2021-01-01", "raise"),
+            ],
         )
     conn.commit()
     yield conn
@@ -190,6 +323,7 @@ def _run_with_policy(
 # ---------------------------------------------------------------------------
 # Phase 1 – basic filters
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 @pytest.mark.postgres
@@ -264,11 +398,13 @@ def test_p1_enum_like_in_list(pg_conn):
         WHERE={
             "AND": [
                 {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
-                {"IN": [
-                    {"col": "employees.employment_type"},
-                    {"value": "full_time"},
-                    {"value": "part_time"},
-                ]},
+                {
+                    "IN": [
+                        {"col": "employees.employment_type"},
+                        {"value": "full_time"},
+                        {"value": "part_time"},
+                    ]
+                },
             ]
         },
         LIMIT=LimitClause(value=10),
@@ -281,6 +417,7 @@ def test_p1_enum_like_in_list(pg_conn):
 # ---------------------------------------------------------------------------
 # Phase 2 – JOINs
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 @pytest.mark.postgres
@@ -339,13 +476,16 @@ def test_p2_order_by_and_offset(pg_conn):
 # Phase 3 – aggregations
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 @pytest.mark.postgres
 def test_p3_count_by_employment_type(pg_conn):
     plan = QueryPlan(
         SELECT=[
             SelectItem(expr={"col": "employees.employment_type"}, alias="etype"),
-            SelectItem(expr={"func": "COUNT", "args": [{"col": "employees.employee_id"}]}, alias="cnt"),
+            SelectItem(
+                expr={"func": "COUNT", "args": [{"col": "employees.employee_id"}]}, alias="cnt"
+            ),
         ],
         FROM=FromClause(table="employees"),
         WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
@@ -354,14 +494,20 @@ def test_p3_count_by_employment_type(pg_conn):
     )
     rows = _run(pg_conn, plan, 3, {"TENANT": TENANT})
     totals = {r["etype"]: r["cnt"] for r in rows}
-    assert totals.get("full_time", 0) == 2 and totals.get("part_time", 0) == 1 and totals.get("contractor", 0) == 2
+    assert (
+        totals.get("full_time", 0) == 2
+        and totals.get("part_time", 0) == 1
+        and totals.get("contractor", 0) == 2
+    )
 
 
 @pytest.mark.integration
 @pytest.mark.postgres
 def test_p3_sum_salary_total(pg_conn):
     plan = QueryPlan(
-        SELECT=[SelectItem(expr={"func": "SUM", "args": [{"col": "employees.salary"}]}, alias="total")],
+        SELECT=[
+            SelectItem(expr={"func": "SUM", "args": [{"col": "employees.salary"}]}, alias="total")
+        ],
         FROM=FromClause(table="employees"),
         WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
         LIMIT=LimitClause(value=1),
@@ -373,6 +519,7 @@ def test_p3_sum_salary_total(pg_conn):
 # ---------------------------------------------------------------------------
 # Phase 5 – CTE
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 @pytest.mark.postgres
@@ -402,6 +549,7 @@ def test_p5_cte_active_full_time(pg_conn):
 # ---------------------------------------------------------------------------
 # Phase 6 – set operations
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 @pytest.mark.postgres
@@ -444,8 +592,13 @@ _ANALYST_POLICY = PolicyConfig(
         "employees": TablePolicy(
             param_bound_columns={"tenant_id": "TENANT"},
             allowed_columns=[
-                "employee_id", "tenant_id", "first_name", "last_name",
-                "department_id", "hire_date", "active",
+                "employee_id",
+                "tenant_id",
+                "first_name",
+                "last_name",
+                "department_id",
+                "hire_date",
+                "active",
             ],
         ),
     },
@@ -502,5 +655,12 @@ def test_policy_allowed_columns_error_details_list_allowlist(pg_conn):
     with pytest.raises(DisallowedColumnError) as exc_info:
         _run_with_policy(pg_conn, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
     allowed = set(exc_info.value.details["allowed_columns"])
-    assert allowed == {"employee_id", "tenant_id", "first_name", "last_name",
-                       "department_id", "hire_date", "active"}
+    assert allowed == {
+        "employee_id",
+        "tenant_id",
+        "first_name",
+        "last_name",
+        "department_id",
+        "hire_date",
+        "active",
+    }

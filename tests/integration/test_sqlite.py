@@ -5,6 +5,7 @@ types (INTEGER, REAL, TEXT, BOOLEAN-as-INTEGER, DATE-as-TEXT, JSON-as-TEXT),
 NULL values, empty strings, enum-like fields, composite primary keys, 1:many,
 many:many, and self-referential joins.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,15 +27,19 @@ from brickql.schema.query_plan import (
     QueryPlan,
     SelectItem,
     SetOpClause,
-    WindowSpec,
 )
 from tests.fixtures import load_ddl, load_schema_snapshot
 
 SNAPSHOT = load_schema_snapshot()
 ALL_TABLES = [
-    "companies", "departments", "employees",
-    "skills", "employee_skills",
-    "projects", "project_assignments", "salary_history",
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
 ]
 TENANT = "tenant_acme"
 OTHER = "other_corp"
@@ -44,10 +49,10 @@ POLICY = PolicyConfig(
     inject_missing_params=True,
     default_limit=0,
     tables={
-        "companies":   _TENANT,
+        "companies": _TENANT,
         "departments": _TENANT,
-        "employees":   _TENANT,
-        "projects":    _TENANT,
+        "employees": _TENANT,
+        "projects": _TENANT,
     },
 )
 
@@ -61,10 +66,17 @@ def db() -> sqlite3.Connection:
     conn.executemany(
         "INSERT INTO companies VALUES (?,?,?,?,?,?,?,?)",
         [
-            (1, TENANT, "Acme Corp", "Technology", 2010, 1,
-             json.dumps({"size": "medium"}), "2025-01-01T00:00:00"),
-            (2, OTHER, "Beta LLC", "Finance", 2015, 1, None,
-             "2025-01-01T00:00:00"),
+            (
+                1,
+                TENANT,
+                "Acme Corp",
+                "Technology",
+                2010,
+                1,
+                json.dumps({"size": "medium"}),
+                "2025-01-01T00:00:00",
+            ),
+            (2, OTHER, "Beta LLC", "Finance", 2015, 1, None, "2025-01-01T00:00:00"),
         ],
     )
 
@@ -80,34 +92,130 @@ def db() -> sqlite3.Connection:
     conn.executemany(
         "INSERT INTO employees VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [
-            (4, TENANT, 1, 3, "Diana", "Prince", "D",
-             "diana@acme.com", "+4567", "full_time", 120000.0,
-             "2018-06-01", "1988-08-30", 1, 0, None, "Director"),
-            (1, TENANT, 1, 1, "Alice", "Smith", None,
-             "alice@acme.com", "+1234", "full_time", 95000.0,
-             "2020-03-15", "1990-05-20", 1, 0, 4, "Senior engineer"),
-            (2, TENANT, 1, 1, "Bob", "Jones", "Robert",
-             "bob@acme.com", None, "part_time", 45000.0,
-             "2021-07-01", None, 1, 1, 4, None),
-            (3, TENANT, 1, 2, "Charlie", "Brown", None,
-             "charlie@acme.com", "+3456", "contractor", None,
-             "2022-01-10", "1985-11-11", 1, 0, None, ""),
-            (5, TENANT, 1, None, "Eve", "Foster", None,
-             "eve@acme.com", None, "contractor", None,
-             "2023-09-01", None, 0, 1, None, None),
-            (6, OTHER, 2, None, "Frank", "Miller", None,
-             "frank@beta.com", None, "full_time", 80000.0,
-             "2019-04-15", None, 1, 0, None, None),
+            (
+                4,
+                TENANT,
+                1,
+                3,
+                "Diana",
+                "Prince",
+                "D",
+                "diana@acme.com",
+                "+4567",
+                "full_time",
+                120000.0,
+                "2018-06-01",
+                "1988-08-30",
+                1,
+                0,
+                None,
+                "Director",
+            ),
+            (
+                1,
+                TENANT,
+                1,
+                1,
+                "Alice",
+                "Smith",
+                None,
+                "alice@acme.com",
+                "+1234",
+                "full_time",
+                95000.0,
+                "2020-03-15",
+                "1990-05-20",
+                1,
+                0,
+                4,
+                "Senior engineer",
+            ),
+            (
+                2,
+                TENANT,
+                1,
+                1,
+                "Bob",
+                "Jones",
+                "Robert",
+                "bob@acme.com",
+                None,
+                "part_time",
+                45000.0,
+                "2021-07-01",
+                None,
+                1,
+                1,
+                4,
+                None,
+            ),
+            (
+                3,
+                TENANT,
+                1,
+                2,
+                "Charlie",
+                "Brown",
+                None,
+                "charlie@acme.com",
+                "+3456",
+                "contractor",
+                None,
+                "2022-01-10",
+                "1985-11-11",
+                1,
+                0,
+                None,
+                "",
+            ),
+            (
+                5,
+                TENANT,
+                1,
+                None,
+                "Eve",
+                "Foster",
+                None,
+                "eve@acme.com",
+                None,
+                "contractor",
+                None,
+                "2023-09-01",
+                None,
+                0,
+                1,
+                None,
+                None,
+            ),
+            (
+                6,
+                OTHER,
+                2,
+                None,
+                "Frank",
+                "Miller",
+                None,
+                "frank@beta.com",
+                None,
+                "full_time",
+                80000.0,
+                "2019-04-15",
+                None,
+                1,
+                0,
+                None,
+                None,
+            ),
         ],
     )
 
     conn.executemany(
         "INSERT INTO skills VALUES (?,?,?)",
         [
-            (1, "Python",        "programming"),
-            (2, "JavaScript",    "programming"),
-            (3, "SQL",           "programming"),
-            (4, "Leadership",    "management"),
+            (1, "Python", "programming"),
+            (2, "JavaScript", "programming"),
+            (3, "SQL", "programming"),
+            (4, "Leadership", "management"),
             (5, "Communication", "soft_skill"),
         ],
     )
@@ -115,8 +223,13 @@ def db() -> sqlite3.Connection:
     conn.executemany(
         "INSERT INTO employee_skills VALUES (?,?,?)",
         [
-            (1, 1, 5), (1, 3, 4), (2, 2, 3), (2, 3, 2),
-            (3, 4, 4), (4, 4, 5), (4, 5, 4),
+            (1, 1, 5),
+            (1, 3, 4),
+            (2, 2, 3),
+            (2, 3, 2),
+            (3, 4, 4),
+            (4, 4, 5),
+            (4, 5, 4),
         ],
     )
 
@@ -124,16 +237,16 @@ def db() -> sqlite3.Connection:
         "INSERT INTO projects VALUES (?,?,?,?,?,?,?,?)",
         [
             (1, TENANT, 1, "Alpha", "active", 100000.0, "2025-01-01", None),
-            (2, TENANT, 1, "Beta",  "planning", None, None, None),
-            (3, OTHER,  2, "Gamma", "completed", 50000.0, "2024-01-01", "2024-12-31"),
+            (2, TENANT, 1, "Beta", "planning", None, None, None),
+            (3, OTHER, 2, "Gamma", "completed", 50000.0, "2024-01-01", "2024-12-31"),
         ],
     )
 
     conn.executemany(
         "INSERT INTO project_assignments VALUES (?,?,?,?)",
         [
-            (1, 1, "tech_lead",       40.0),
-            (1, 2, "developer",       20.0),
+            (1, 1, "tech_lead", 40.0),
+            (1, 2, "developer", 20.0),
             (2, 4, "project_manager", None),
         ],
     )
@@ -201,6 +314,7 @@ def _run_with_policy(
 # Phase 1 – basic filters
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_p1_tenant_isolation(db):
     plan = QueryPlan(
@@ -257,7 +371,7 @@ def test_p1_empty_string_notes(db):
     )
     rows = _run(db, plan, 1)
     ids = [r["id"] for r in rows]
-    assert 3 in ids   # Charlie notes = ""
+    assert 3 in ids  # Charlie notes = ""
     assert 1 not in ids
 
 
@@ -269,11 +383,13 @@ def test_p1_enum_like_in_list(db):
         WHERE={
             "AND": [
                 {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
-                {"IN": [
-                    {"col": "employees.employment_type"},
-                    {"value": "full_time"},
-                    {"value": "part_time"},
-                ]},
+                {
+                    "IN": [
+                        {"col": "employees.employment_type"},
+                        {"value": "full_time"},
+                        {"value": "part_time"},
+                    ]
+                },
             ]
         },
         LIMIT=LimitClause(value=10),
@@ -289,6 +405,7 @@ def test_p1_enum_like_in_list(db):
 # ---------------------------------------------------------------------------
 # Phase 2 – JOINs
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 def test_p2_one_to_many_join(db):
@@ -348,6 +465,7 @@ def test_p2_order_by_and_offset(db):
 # Phase 3 – aggregations
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_p3_count_by_employment_type(db):
     plan = QueryPlan(
@@ -391,6 +509,7 @@ def test_p3_sum_salary_total(db):
 # Phase 5 – CTE
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 def test_p5_cte_active_full_time(db):
     cte_body = QueryPlan(
@@ -418,6 +537,7 @@ def test_p5_cte_active_full_time(db):
 # ---------------------------------------------------------------------------
 # Phase 6 – set operations
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.integration
 def test_p6_union_all_active_inactive(db):
@@ -459,8 +579,13 @@ _ANALYST_POLICY = PolicyConfig(
         "employees": TablePolicy(
             param_bound_columns={"tenant_id": "TENANT"},
             allowed_columns=[
-                "employee_id", "tenant_id", "first_name", "last_name",
-                "department_id", "hire_date", "active",
+                "employee_id",
+                "tenant_id",
+                "first_name",
+                "last_name",
+                "department_id",
+                "hire_date",
+                "active",
             ],
         ),
     },
@@ -514,5 +639,12 @@ def test_policy_allowed_columns_error_details_list_allowlist(db):
     with pytest.raises(DisallowedColumnError) as exc_info:
         _run_with_policy(db, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
     allowed = set(exc_info.value.details["allowed_columns"])
-    assert allowed == {"employee_id", "tenant_id", "first_name", "last_name",
-                       "department_id", "hire_date", "active"}
+    assert allowed == {
+        "employee_id",
+        "tenant_id",
+        "first_name",
+        "last_name",
+        "department_id",
+        "hire_date",
+        "active",
+    }

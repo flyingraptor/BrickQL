@@ -23,13 +23,14 @@ Usage::
     class MySQLCompiler(SQLCompiler):
         ...
 """
+
 from __future__ import annotations
 
-from typing import Callable, Type
+from collections.abc import Callable
+from typing import ClassVar
 
 from brickql.compile.base import SQLCompiler
 from brickql.errors import CompilationError
-
 
 # ---------------------------------------------------------------------------
 # Compiler factory
@@ -51,12 +52,10 @@ class CompilerFactory:
         compiler = CompilerFactory.create("mysql")
     """
 
-    _compilers: dict[str, Type[SQLCompiler]] = {}
+    _compilers: ClassVar[dict[str, type[SQLCompiler]]] = {}
 
     @classmethod
-    def register(
-        cls, name: str
-    ) -> Callable[[Type[SQLCompiler]], Type[SQLCompiler]]:
+    def register(cls, name: str) -> Callable[[type[SQLCompiler]], type[SQLCompiler]]:
         """Decorator that registers a compiler class under ``name``.
 
         Args:
@@ -66,14 +65,14 @@ class CompilerFactory:
             A decorator that registers and returns the compiler class.
         """
 
-        def decorator(compiler_cls: Type[SQLCompiler]) -> Type[SQLCompiler]:
+        def decorator(compiler_cls: type[SQLCompiler]) -> type[SQLCompiler]:
             cls._compilers[name] = compiler_cls
             return compiler_cls
 
         return decorator
 
     @classmethod
-    def register_class(cls, name: str, compiler_cls: Type[SQLCompiler]) -> None:
+    def register_class(cls, name: str, compiler_cls: type[SQLCompiler]) -> None:
         """Register a compiler class without using the decorator form.
 
         Args:
@@ -99,8 +98,7 @@ class CompilerFactory:
         if compiler_cls is None:
             registered = sorted(cls._compilers)
             raise CompilationError(
-                f"Unsupported dialect target: '{name}'. "
-                f"Registered targets: {registered}."
+                f"Unsupported dialect target: '{name}'. Registered targets: {registered}."
             )
         return compiler_cls()
 
@@ -134,7 +132,7 @@ class OperatorRegistry:
             return f"{left} REGEXP {right}"
     """
 
-    _operators: dict[str, OperatorHandler] = {}
+    _operators: ClassVar[dict[str, OperatorHandler]] = {}
 
     @classmethod
     def register(cls, name: str) -> Callable[[OperatorHandler], OperatorHandler]:

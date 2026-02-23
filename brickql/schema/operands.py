@@ -14,12 +14,12 @@ Usage::
     assert isinstance(item.expr, ColumnOperand)
     assert item.expr.col == "employees.name"
 """
+
 from __future__ import annotations
 
-from typing import Annotated, Any, Union
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter, model_validator
-
 
 # ---------------------------------------------------------------------------
 # Forward-reference-safe base config
@@ -63,7 +63,7 @@ class FuncOperand(BaseModel):
     model_config = _FORBID
 
     func: str
-    args: list["Operand"] = Field(default_factory=list)
+    args: list[Operand] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ class CaseWhen(BaseModel):
     # "if" is a Python keyword so we store it under the Python name
     # ``condition`` but tell Pydantic its JSON alias is ``"if"``.
     condition: dict[str, Any] = Field(alias="if")
-    then: "Operand"
+    then: Operand
 
     @model_validator(mode="before")
     @classmethod
@@ -103,7 +103,7 @@ class CaseBody(BaseModel):
 
     when: list[CaseWhen]
     # "else" is a Python keyword; stored as ``else_val``, alias ``"else"``.
-    else_val: "Operand | None" = Field(None, alias="else")
+    else_val: Operand | None = Field(None, alias="else")
 
 
 class CaseOperand(BaseModel):
@@ -139,13 +139,11 @@ def _operand_discriminator(v: Any) -> str | None:
 
 
 Operand = Annotated[
-    Union[
-        Annotated[ColumnOperand, Tag("col")],
-        Annotated[ValueOperand, Tag("value")],
-        Annotated[ParamOperand, Tag("param")],
-        Annotated[FuncOperand, Tag("func")],
-        Annotated[CaseOperand, Tag("case")],
-    ],
+    Annotated[ColumnOperand, Tag("col")]
+    | Annotated[ValueOperand, Tag("value")]
+    | Annotated[ParamOperand, Tag("param")]
+    | Annotated[FuncOperand, Tag("func")]
+    | Annotated[CaseOperand, Tag("case")],
     Discriminator(_operand_discriminator),
 ]
 

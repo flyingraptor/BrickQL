@@ -38,6 +38,7 @@ in any combination, with no hidden stacking::
         .build()
     )
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -62,9 +63,20 @@ SUPPORTED_FUNCTIONS: frozenset[str] = AGGREGATE_FUNCTIONS
 
 # Base operators available in every profile (single-table filters).
 _BASE_OPERATORS: list[str] = [
-    "EQ", "NE", "GT", "GTE", "LT", "LTE",
-    "BETWEEN", "IN", "IS_NULL", "IS_NOT_NULL", "LIKE",
-    "AND", "OR", "NOT",
+    "EQ",
+    "NE",
+    "GT",
+    "GTE",
+    "LT",
+    "LTE",
+    "BETWEEN",
+    "IN",
+    "IS_NULL",
+    "IS_NOT_NULL",
+    "LIKE",
+    "AND",
+    "OR",
+    "NOT",
 ]
 
 # Extra operators unlocked by .joins() — ILIKE for case-insensitive matching.
@@ -92,9 +104,7 @@ class AllowedFeatures(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tables: list[str] = Field(default_factory=list)
-    operators: list[str] = Field(
-        default_factory=lambda: list(SUPPORTED_OPERATORS)
-    )
+    operators: list[str] = Field(default_factory=lambda: list(SUPPORTED_OPERATORS))
     functions: list[str] = Field(default_factory=list)
     allow_subqueries: bool = False
     allow_cte: bool = False
@@ -126,7 +136,7 @@ class DialectProfile(BaseModel):
         tables: list[str],
         target: DialectTarget = "postgres",
         max_limit: int = 200,
-    ) -> "DialectProfileBuilder":
+    ) -> DialectProfileBuilder:
         """Return a :class:`DialectProfileBuilder` to compose SQL features.
 
         The base profile allows single-table ``SELECT / WHERE / LIMIT``.
@@ -194,7 +204,7 @@ class DialectProfileBuilder:
         self._allow_window_functions: bool = False
         self._allow_set_operations: bool = False
 
-    def joins(self, max_join_depth: int = 2) -> "DialectProfileBuilder":
+    def joins(self, max_join_depth: int = 2) -> DialectProfileBuilder:
         """Enable JOIN clauses (inner, left, self-referential, many-to-many),
         ORDER BY, OFFSET, DISTINCT, and ILIKE.
 
@@ -207,7 +217,7 @@ class DialectProfileBuilder:
                 self._operators.append(op)
         return self
 
-    def aggregations(self) -> "DialectProfileBuilder":
+    def aggregations(self) -> DialectProfileBuilder:
         """Enable GROUP BY, HAVING, aggregate functions (COUNT, SUM, AVG,
         MIN, MAX), and CASE expressions."""
         for fn in ("COUNT", "SUM", "AVG", "MIN", "MAX"):
@@ -215,7 +225,7 @@ class DialectProfileBuilder:
                 self._functions.append(fn)
         return self
 
-    def scalar_functions(self, *functions: str) -> "DialectProfileBuilder":
+    def scalar_functions(self, *functions: str) -> DialectProfileBuilder:
         """Allow additional scalar (non-aggregate) functions by name.
 
         Use this to expose backend-specific functions like ``DATE_PART``,
@@ -230,7 +240,7 @@ class DialectProfileBuilder:
                 self._functions.append(fn)
         return self
 
-    def subqueries(self) -> "DialectProfileBuilder":
+    def subqueries(self) -> DialectProfileBuilder:
         """Enable correlated and uncorrelated subqueries: derived tables,
         EXISTS predicates, and IN subquery."""
         self._allow_subqueries = True
@@ -239,17 +249,17 @@ class DialectProfileBuilder:
                 self._operators.append(op)
         return self
 
-    def ctes(self) -> "DialectProfileBuilder":
+    def ctes(self) -> DialectProfileBuilder:
         """Enable Common Table Expressions (WITH / WITH RECURSIVE)."""
         self._allow_cte = True
         return self
 
-    def set_operations(self) -> "DialectProfileBuilder":
+    def set_operations(self) -> DialectProfileBuilder:
         """Enable set operations: UNION, UNION ALL, INTERSECT, EXCEPT."""
         self._allow_set_operations = True
         return self
 
-    def window_functions(self) -> "DialectProfileBuilder":
+    def window_functions(self) -> DialectProfileBuilder:
         """Enable window functions: ROW_NUMBER, RANK, DENSE_RANK, NTILE,
         LAG, LEAD, FIRST_VALUE, LAST_VALUE, and OVER / PARTITION BY."""
         self._allow_window_functions = True

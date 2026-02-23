@@ -34,6 +34,7 @@ Example — per-role column allowlist (RBAC pattern)::
     params = compiled.merge_runtime_params({"TENANT": tenant_id})
     cursor.execute(compiled.sql, params)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -207,12 +208,11 @@ class PolicyEngine:
             self._assert_col_not_denied(col_ref)
 
     def _assert_col_not_denied(self, col_ref: str) -> None:
-        col_name = col_ref.split(".")[-1]
-        table_name = col_ref.split(".")[0] if "." in col_ref else None
+        col_name = col_ref.rsplit(".", maxsplit=1)[-1]
+        table_name = col_ref.split(".", maxsplit=1)[0] if "." in col_ref else None
 
         globally_denied = (
-            col_ref in self._config.denied_columns
-            or col_name in self._config.denied_columns
+            col_ref in self._config.denied_columns or col_name in self._config.denied_columns
         )
 
         per_table_denied = False
@@ -244,11 +244,7 @@ class PolicyEngine:
         all_denied = set(self._config.denied_columns_for(table_name))
         if tpol is not None and tpol.allowed_columns:
             return [c for c in tpol.allowed_columns if c not in all_denied]
-        return [
-            c
-            for c in self._snapshot.get_column_names(table_name)
-            if c not in all_denied
-        ]
+        return [c for c in self._snapshot.get_column_names(table_name) if c not in all_denied]
 
     # ------------------------------------------------------------------
     # Parameter-bound column enforcement
@@ -261,9 +257,7 @@ class PolicyEngine:
             if not tpol or not tpol.param_bound_columns:
                 continue
             for col_name, param_name in tpol.param_bound_columns.items():
-                plan = self._enforce_single_param(
-                    plan, table_name, col_name, param_name
-                )
+                plan = self._enforce_single_param(plan, table_name, col_name, param_name)
         return plan
 
     def _enforce_single_param(
@@ -275,9 +269,7 @@ class PolicyEngine:
     ) -> QueryPlan:
         """Ensure WHERE contains ``table.col = :param`` for a bound column."""
         col_ref = f"{table_name}.{col_name}"
-        required_pred: dict[str, Any] = {
-            "EQ": [{"col": col_ref}, {"param": param_name}]
-        }
+        required_pred: dict[str, Any] = {"EQ": [{"col": col_ref}, {"param": param_name}]}
 
         if plan.WHERE is None:
             if self._config.inject_missing_params:
@@ -293,9 +285,7 @@ class PolicyEngine:
 
         raise MissingParamError(col_ref, param_name)
 
-    def _where_satisfies_param(
-        self, pred: dict, col_ref: str, param_name: str
-    ) -> bool:
+    def _where_satisfies_param(self, pred: dict, col_ref: str, param_name: str) -> bool:
         """Return True if pred already enforces ``col = :param``."""
         if not isinstance(pred, dict) or len(pred) != 1:
             return False
@@ -304,15 +294,14 @@ class PolicyEngine:
         if op == "EQ" and isinstance(args, list) and len(args) == 2:
             lhs, rhs = args
             if (
-                isinstance(lhs, dict) and lhs.get("col") == col_ref
-                and isinstance(rhs, dict) and rhs.get("param") == param_name
+                isinstance(lhs, dict)
+                and lhs.get("col") == col_ref
+                and isinstance(rhs, dict)
+                and rhs.get("param") == param_name
             ):
                 return True
         if op in ("AND", "OR") and isinstance(args, list):
-            return any(
-                self._where_satisfies_param(sub, col_ref, param_name)
-                for sub in args
-            )
+            return any(self._where_satisfies_param(sub, col_ref, param_name) for sub in args)
         return False
 
     # ------------------------------------------------------------------
@@ -329,7 +318,5 @@ class PolicyEngine:
                 )
             return plan
         if plan.LIMIT.value > max_limit:
-            return plan.model_copy(
-                update={"LIMIT": LimitClause(value=max_limit)}, deep=True
-            )
+            return plan.model_copy(update={"LIMIT": LimitClause(value=max_limit)}, deep=True)
         return plan

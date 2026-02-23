@@ -8,6 +8,7 @@ Both receive a :class:`~brickql.schema.context.ValidationContext` and a
 :attr:`cte_names` frozenset that grows as the outer query discovers CTE
 and derived-table virtual names.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -16,8 +17,8 @@ from brickql.errors import DialectViolationError, ValidationError
 from brickql.schema.column_reference import ColumnReference
 from brickql.schema.context import ValidationContext
 from brickql.schema.expressions import (
-    ALL_PREDICATE_OPS,
     AGGREGATE_FUNCTIONS,
+    ALL_PREDICATE_OPS,
     COMPARISON_OPS,
     EXISTS_OPS,
     LOGICAL_AND_OR,
@@ -52,7 +53,7 @@ class OperandValidator:
         self,
         ctx: ValidationContext,
         cte_names: frozenset[str],
-        predicate_validator: "PredicateValidator",
+        predicate_validator: PredicateValidator,
     ) -> None:
         self._ctx = ctx
         self._cte_names = cte_names
@@ -157,8 +158,7 @@ class OperandValidator:
             )
         if not is_aggregate and allowed_funcs and func_name not in allowed_funcs:
             raise DialectViolationError(
-                f"Function '{func_name}' is not in the allowed functions list: "
-                f"{allowed_funcs}.",
+                f"Function '{func_name}' is not in the allowed functions list: {allowed_funcs}.",
                 feature="functions",
             )
         for arg in expr.args:
@@ -211,16 +211,13 @@ class PredicateValidator:
         op = next(iter(pred))
         if op not in ALL_PREDICATE_OPS:
             raise ValidationError(
-                f"Unknown predicate operator '{op}'. "
-                f"Allowed: {sorted(ALL_PREDICATE_OPS)}.",
+                f"Unknown predicate operator '{op}'. Allowed: {sorted(ALL_PREDICATE_OPS)}.",
                 code="SCHEMA_ERROR",
             )
         self._assert_operator_allowed(op)
         args = pred[op]
 
-        if op in COMPARISON_OPS:
-            self._expect_operand_list(args, op, count=2)
-        elif op in PATTERN_OPS:
+        if op in COMPARISON_OPS or op in PATTERN_OPS:
             self._expect_operand_list(args, op, count=2)
         elif op in RANGE_OPS:
             self._expect_operand_list(args, op, count=3)
@@ -259,9 +256,7 @@ class PredicateValidator:
         elif op in LOGICAL_NOT:
             self.validate(args)
 
-    def _expect_operand_list(
-        self, args: Any, op: str, count: int
-    ) -> None:
+    def _expect_operand_list(self, args: Any, op: str, count: int) -> None:
         if not isinstance(args, list) or len(args) != count:
             raise ValidationError(
                 f"{op} requires exactly {count} operands, got {args!r}.",

@@ -4,6 +4,7 @@ Checks that the plan does not use SQL features disabled in the
 ``DialectProfile`` (CTEs, subqueries, window functions, set operations,
 and JOIN depth).
 """
+
 from __future__ import annotations
 
 from brickql.errors import DialectViolationError
@@ -35,9 +36,7 @@ class DialectValidator:
         allowed = self._ctx.dialect.allowed
 
         if plan.JOIN and allowed.max_join_depth == 0:
-            raise DialectViolationError(
-                "JOINs are not allowed (max_join_depth=0).", feature="join"
-            )
+            raise DialectViolationError("JOINs are not allowed (max_join_depth=0).", feature="join")
         if plan.CTE and not allowed.allow_cte:
             raise DialectViolationError(
                 "CTE (WITH) is not enabled in the dialect profile.",
@@ -65,8 +64,7 @@ class DialectValidator:
         allowed = self._ctx.dialect.allowed
         if len(plan.JOIN) > allowed.max_join_depth:
             raise DialectViolationError(
-                f"Query uses {len(plan.JOIN)} JOIN(s) but "
-                f"max_join_depth={allowed.max_join_depth}.",
+                f"Query uses {len(plan.JOIN)} JOIN(s) but max_join_depth={allowed.max_join_depth}.",
                 feature="max_join_depth",
             )
 

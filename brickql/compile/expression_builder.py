@@ -7,10 +7,15 @@ so they share a module.
 Both classes receive a :class:`~brickql.compile.context.CompilationContext`
 (static config) and a :class:`RuntimeContext` (per-query parameter state).
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from brickql.schema.query_plan import QueryPlan
 
 from brickql.compile.context import CompilationContext
 from brickql.errors import CompilationError
@@ -25,7 +30,6 @@ from brickql.schema.operands import (
     ValueOperand,
     to_operand,
 )
-
 
 # ---------------------------------------------------------------------------
 # Runtime parameter accumulator (shared across all sub-builders in one run)
@@ -71,7 +75,7 @@ class OperandBuilder:
         self,
         ctx: CompilationContext,
         runtime: RuntimeContext,
-        predicate_builder: "PredicateBuilder",
+        predicate_builder: PredicateBuilder,
     ) -> None:
         self._ctx = ctx
         self._runtime = runtime
@@ -156,7 +160,7 @@ class PredicateBuilder:
         self._runtime = runtime
         self._op = operand_builder
         # Injected by QueryBuilder after construction.
-        self._build_subquery_fn: Callable[["QueryPlan"], str] | None = None  # type: ignore[name-defined]
+        self._build_subquery_fn: Callable[[QueryPlan], str] | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -174,7 +178,7 @@ class PredicateBuilder:
     # Operator dispatch
     # ------------------------------------------------------------------
 
-    _CMP: dict[str, str] = {
+    _CMP: ClassVar[dict[str, str]] = {
         ComparisonOp.EQ: "=",
         ComparisonOp.NE: "!=",
         ComparisonOp.GT: ">",

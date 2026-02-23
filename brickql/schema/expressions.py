@@ -5,6 +5,7 @@ Operands and predicates are represented as plain dicts in the QueryPlan model
 This module defines the allowable key sets and helpers used by both the
 validator and the compiler.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -120,13 +121,7 @@ LOGICAL_OPS: frozenset[str] = frozenset(op.value for op in LogicalOp)
 
 #: Complete set of supported predicate operators.
 ALL_PREDICATE_OPS: frozenset[str] = (
-    COMPARISON_OPS
-    | PATTERN_OPS
-    | RANGE_OPS
-    | MEMBERSHIP_OPS
-    | NULL_OPS
-    | EXISTS_OPS
-    | LOGICAL_OPS
+    COMPARISON_OPS | PATTERN_OPS | RANGE_OPS | MEMBERSHIP_OPS | NULL_OPS | EXISTS_OPS | LOGICAL_OPS
 )
 
 # ---------------------------------------------------------------------------
@@ -137,10 +132,19 @@ ALL_PREDICATE_OPS: frozenset[str] = (
 AGGREGATE_FUNCTIONS: frozenset[str] = frozenset({"COUNT", "SUM", "AVG", "MIN", "MAX"})
 
 #: Window-only ranking / navigation functions.
-WINDOW_FUNCTIONS: frozenset[str] = frozenset({
-    "ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE",
-    "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE",
-})
+WINDOW_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "ROW_NUMBER",
+        "RANK",
+        "DENSE_RANK",
+        "NTILE",
+        "LAG",
+        "LEAD",
+        "FIRST_VALUE",
+        "LAST_VALUE",
+        "NTH_VALUE",
+    }
+)
 
 #: All registered functions.
 REGISTERED_FUNCTIONS: frozenset[str] = AGGREGATE_FUNCTIONS | WINDOW_FUNCTIONS

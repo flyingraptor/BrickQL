@@ -1,7 +1,6 @@
 """Unit tests for QueryBuilder (both dialects)."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from brickql.compile.builder import QueryBuilder
 from brickql.compile.postgres import PostgresCompiler
@@ -136,9 +135,7 @@ def test_row_number_over_partition_by():
                 expr={"func": "ROW_NUMBER", "args": []},
                 over=WindowSpec(
                     partition_by=[{"col": "employees.department_id"}],
-                    order_by=[
-                        OrderByItem(expr={"col": "employees.hire_date"}, direction="ASC")
-                    ],
+                    order_by=[OrderByItem(expr={"col": "employees.hire_date"}, direction="ASC")],
                 ),
                 alias="rn",
             ),

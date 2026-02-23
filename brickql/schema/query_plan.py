@@ -7,6 +7,7 @@ and window ``PARTITION BY`` are now typed via the ``Operand`` union.
 Predicate nodes (``WHERE``, ``HAVING``) remain as ``dict[str, Any]``
 and are validated deeply by ``PlanValidator``.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -14,9 +15,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from brickql.schema.operands import (
+    CaseOperand,
     ColumnOperand,
     FuncOperand,
-    CaseOperand,
     Operand,
 )
 

@@ -1,4 +1,5 @@
 """SQLite dialect compiler."""
+
 from __future__ import annotations
 
 from brickql.compile.base import SQLCompiler

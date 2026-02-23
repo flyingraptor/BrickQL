@@ -4,6 +4,7 @@ Packages the ``(snapshot, dialect)`` data clump that was repeated across
 ``PlanValidator``, ``OperandValidator``, ``PredicateValidator``, and all
 their sub-validators into a single cohesive object.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

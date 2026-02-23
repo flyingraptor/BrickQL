@@ -17,9 +17,10 @@ WindowSpecBuilder     — ``OVER (PARTITION BY … ORDER BY … FRAME)``
 CteBuilder            — ``WITH [RECURSIVE] <ctes>``
 SetOpBuilder          — ``UNION / INTERSECT / EXCEPT …``
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from brickql.compile.context import CompilationContext
 from brickql.compile.expression_builder import OperandBuilder, RuntimeContext
@@ -60,9 +61,7 @@ class SelectClauseBuilder:
     def _build_item(self, item: SelectItem) -> str:
         if item.over is not None:
             expr_sql = self._op.build(item.expr)
-            over_sql = WindowSpecBuilder(self._ctx, self._runtime, self._op).build(
-                item.over
-            )
+            over_sql = WindowSpecBuilder(self._ctx, self._runtime, self._op).build(item.over)
             expr_sql = f"{expr_sql} OVER ({over_sql})"
         else:
             expr_sql = self._op.build(item.expr)
@@ -143,14 +142,10 @@ class WindowSpecBuilder:
             exprs = ", ".join(self._op.build(e) for e in spec.partition_by)
             parts.append(f"PARTITION BY {exprs}")
         if spec.order_by:
-            order_parts = [
-                f"{self._op.build(o.expr)} {o.direction}" for o in spec.order_by
-            ]
+            order_parts = [f"{self._op.build(o.expr)} {o.direction}" for o in spec.order_by]
             parts.append(f"ORDER BY {', '.join(order_parts)}")
         if spec.frame:
-            parts.append(
-                f"{spec.frame.type} BETWEEN {spec.frame.start} AND {spec.frame.end}"
-            )
+            parts.append(f"{spec.frame.type} BETWEEN {spec.frame.start} AND {spec.frame.end}")
         return " ".join(parts)
 
 
@@ -195,9 +190,7 @@ class SetOpBuilder:
         self._build_fn = build_fn
 
     def build(self, set_op: SetOpClause) -> str:
-        right_plan = set_op.query.model_copy(
-            update={"LIMIT": None, "OFFSET": None}, deep=True
-        )
+        right_plan = set_op.query.model_copy(update={"LIMIT": None, "OFFSET": None}, deep=True)
         right_sql = self._build_fn(right_plan)
         keyword = set_op.op.replace("_", " ")
         return f"{keyword}\n{right_sql}"
