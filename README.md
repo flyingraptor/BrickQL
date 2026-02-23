@@ -20,6 +20,23 @@ brickQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JS
 
 ---
 
+## Security model
+
+brickQL implements the design patterns recommended for SQL agents in [*Design Patterns for Securing LLM Agents against Prompt Injections*](https://arxiv.org/abs/2506.08837) (Beurer-Kellner et al., 2025).
+
+Among its ten case studies, §4.2 examines SQL agents under a threat model where the attacker can control the input query or the database content, with goals ranging from unauthorized data extraction to remote code execution. That case study concludes that the **Plan-Then-Execute** pattern is the correct baseline, and Appendix A identifies **strict output formatting** and **least-privilege access control** as mandatory best practices across all agent types. brickQL maps each of these directly to code:
+
+| Paper recommendation | brickQL implementation |
+|---|---|
+| **Plan-Then-Execute** — LLM commits to a query plan *before* any database data is returned to it, so database contents can never inject new instructions | The LLM outputs a `QueryPlan` JSON; brickQL validates and compiles it to SQL without ever feeding query results back to the LLM |
+| **Strict output formatting** — constrain the LLM to a well-specified format rather than free-form SQL | `QueryPlan` is a typed Pydantic model; free-form SQL is structurally impossible |
+| **Least-privilege access control** — restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound tenant columns |
+| **Parameterized execution** — prevent SQL injection from literal values in the plan | All `{"value": …}` operands are compiled to named placeholders; no string interpolation occurs anywhere in the compilation path |
+
+The OR-bypass hardening in `PolicyEngine._where_satisfies_param` (which ensures a param-bound column cannot be satisfied by placing the required predicate inside an `OR` branch) and the `build_repair_prompt` sanitization (which re-serializes the previous plan through `json.loads` / `json.dumps` before feeding it back to the LLM) are direct responses to security risks identified through the paper's threat model.
+
+---
+
 ## Installation
 
 ```bash
@@ -400,6 +417,51 @@ def _regexp_handler(op, args, build_operand):
 
 ---
 
+## Known limitations
+
+| Limitation | Workaround |
+|---|---|
+| **Scalar subqueries in comparison operators** — `salary > (SELECT AVG(salary) …)` is not a supported operand type. | Use a window-function CTE: compute `AVG(salary) OVER ()` inside the CTE so every row carries the aggregate, then filter on that result column in the outer query. See the example below. |
+| **JOIN alias column references** — column references in SELECT / WHERE must use the original table name, not a JOIN alias. The exception is CTE names, which can be used as table qualifiers. | Use the real table name in all column references; aliases are only for output renaming. |
+
+**Scalar subquery workaround — window-function CTE**
+
+Goal: *list employees whose salary is above the overall average.*
+
+```json
+{
+  "CTE": [{
+    "name": "emp_with_avg",
+    "query": {
+      "SELECT": [
+        {"expr": {"col": "employees.first_name"}},
+        {"expr": {"col": "employees.last_name"}},
+        {"expr": {"col": "employees.salary"}},
+        {
+          "expr": {"func": "AVG", "args": [{"col": "employees.salary"}]},
+          "alias": "avg_sal",
+          "over": {"partition_by": []}
+        }
+      ],
+      "FROM": {"table": "employees"},
+      "WHERE": {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]}
+    }
+  }],
+  "SELECT": [
+    {"expr": {"col": "emp_with_avg.first_name"}},
+    {"expr": {"col": "emp_with_avg.last_name"}},
+    {"expr": {"col": "emp_with_avg.salary"}}
+  ],
+  "FROM": {"table": "emp_with_avg"},
+  "WHERE": {"GT": [{"col": "emp_with_avg.salary"}, {"col": "emp_with_avg.avg_sal"}]},
+  "LIMIT": {"value": 50}
+}
+```
+
+Dialect requirements: `.aggregations()`, `.subqueries()`, `.ctes()`, `.window_functions()`.
+
+---
+
 ## Development
 
 ```bash
@@ -459,23 +521,10 @@ brickql/
   prompt/
     builder.py            # PromptBuilder + PromptComponents
   errors.py               # Exception hierarchy (brickQLError and subclasses)
-examples/
-  cases/                  # Named test cases (c01–c10) covering SQL feature categories
-  trials/                 # Runtime trial outputs — gitignored, generated locally
-  runner.py               # CLI: run cases against SQLite/Postgres with optional Ollama
-  _case.py                # Case dataclass definition
-  _ollama.py              # Thin Ollama client (langchain-ollama)
-  _seed.py                # In-memory SQLite seeder
-  _setup.py               # Shared schema snapshot, dialect, and policy helpers
-  _trial.py               # TrialResult serialisation
-  README.md               # Examples usage guide
 docs/
   how-it-works.mmd        # Simple end-to-end flow (Mermaid)
   how-it-works.png        # Rendered architecture diagram (used in README)
   how-it-works.excalidraw # Visual flow diagram (Excalidraw)
-  flow-diagram.mmd        # Detailed processing flow with sub-component breakdown (Mermaid)
-  class-diagram.mmd       # Full class relations (Mermaid)
-  code-walkthrough.md     # Per-file explanations with full call-sequence trace
 tests/
   fixtures/               # schema.json, ddl_sqlite.sql, ddl_postgres.sql
   integration/            # SQLite (in-memory) and PostgreSQL (Docker) integration tests

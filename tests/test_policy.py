@@ -319,6 +319,75 @@ def test_allowed_columns_blocked_in_where_clause():
     assert exc_info.value.details["column"] == "salary"
 
 
+# ---------------------------------------------------------------------------
+# _where_satisfies_param — OR-bypass security tests
+# ---------------------------------------------------------------------------
+
+
+def test_param_nested_in_and_satisfies_binding():
+    """A param binding inside AND must satisfy the check — no re-injection needed."""
+    where = {
+        "AND": [
+            {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+            {"EQ": [{"col": "employees.active"}, {"value": True}]},
+        ]
+    }
+    plan = _emp_plan(where=where)
+    result = _engine(inject=True).apply(plan)
+    assert result.WHERE == where
+
+
+def test_param_nested_in_or_does_not_satisfy_binding():
+    """A param binding nested inside OR must NOT satisfy the check.
+
+    An OR makes the restriction optional: rows from other tenants can be
+    returned via the second branch.  The engine must detect this and wrap
+    the whole WHERE in AND with the required predicate.
+    """
+    where = {
+        "OR": [
+            {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+            {"EQ": [{"col": "employees.active"}, {"value": True}]},
+        ]
+    }
+    plan = _emp_plan(where=where)
+    result = _engine(inject=True).apply(plan)
+    # OR does not enforce the binding, so the engine must wrap in AND
+    assert result.WHERE is not None
+    assert "AND" in result.WHERE
+
+
+def test_param_nested_in_or_with_injection_disabled_raises():
+    """When inject_missing_params is False, an OR-nested binding must raise."""
+    where = {
+        "OR": [
+            {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+            {"EQ": [{"col": "employees.active"}, {"value": True}]},
+        ]
+    }
+    plan = _emp_plan(where=where)
+    with pytest.raises(MissingParamError):
+        _engine(inject=False).apply(plan)
+
+
+def test_param_nested_deeply_in_or_does_not_satisfy_binding():
+    """Binding inside a nested OR (AND → OR → EQ) must not satisfy the check."""
+    where = {
+        "AND": [
+            {"EQ": [{"col": "employees.department_id"}, {"value": 5}]},
+            {
+                "OR": [
+                    {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                    {"EQ": [{"col": "employees.active"}, {"value": True}]},
+                ]
+            },
+        ]
+    }
+    plan = _emp_plan(where=where)
+    result = _engine(inject=True).apply(plan)
+    assert "AND" in result.WHERE
+
+
 def test_denied_columns_subtracted_from_allowlist_in_error_details():
     policy = PolicyConfig(
         inject_missing_params=False,

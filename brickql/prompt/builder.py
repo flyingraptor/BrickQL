@@ -208,6 +208,13 @@ class PromptBuilder:
     ) -> PromptComponents:
         """Build a correction prompt after a validation error.
 
+        ``previous_plan_json`` is re-serialized through ``json.loads`` /
+        ``json.dumps`` before being embedded.  This strips any non-JSON text
+        that could surround an LLM response (e.g. injected instructions
+        appended after the closing brace) so that only the structural JSON
+        content re-enters the LLM context.  If the string is not valid JSON,
+        a safe placeholder is used instead.
+
         Args:
             error_response: The structured error dict returned by
                 ``ValidationError.to_error_response()``.
@@ -217,9 +224,13 @@ class PromptBuilder:
             ``PromptComponents`` with a repair-focused user prompt.
         """
         error_text = json.dumps(error_response, indent=2)
+        try:
+            sanitized_plan_json = json.dumps(json.loads(previous_plan_json), indent=2)
+        except (json.JSONDecodeError, ValueError):
+            sanitized_plan_json = "<plan could not be parsed as JSON>"
         repair_question = (
             f"The following QueryPlan produced an error:\n"
-            f"```json\n{previous_plan_json}\n```\n\n"
+            f"```json\n{sanitized_plan_json}\n```\n\n"
             f"Error:\n```json\n{error_text}\n```\n\n"
             f"Output only a corrected QueryPlan JSON. "
             f"Do not include commentary. "

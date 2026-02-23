@@ -300,7 +300,10 @@ class PolicyEngine:
                 and rhs.get("param") == param_name
             ):
                 return True
-        if op in ("AND", "OR") and isinstance(args, list):
+        # Only recurse into AND: a binding inside OR does not guarantee the
+        # column is filtered — the OR branch makes the restriction optional,
+        # which would allow cross-tenant access.
+        if op == "AND" and isinstance(args, list):
             return any(self._where_satisfies_param(sub, col_ref, param_name) for sub in args)
         return False
 
