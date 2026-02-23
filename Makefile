@@ -63,10 +63,12 @@ test-integration-postgres:  ## Run PostgreSQL integration tests (starts and stop
 	docker stop $(PG_CONTAINER); \
 	exit $$EXIT
 
-test:  ## Run all tests except Postgres integration
+test:  ## Run all tests (unit + SQLite + PostgreSQL integration)
+	$(MAKE) docker-postgres-clean
 	$(PYTEST) tests/ -m "not postgres" -v
+	$(MAKE) test-integration-postgres
 
-ci:  ## Full CI pipeline: lint + typecheck + unit + sqlite integration
+ci:  ## Full CI pipeline: lint + typecheck + all tests
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test

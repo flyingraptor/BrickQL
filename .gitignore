@@ -52,6 +52,7 @@ examples/
 # Generated Mermaid diagrams
 docs/class-diagram.mmd
 docs/flow-diagram.mmd
+docs/sequence-diagram.mmd
 
 # Generated documentation
 docs/code-walkthrough.md
