@@ -112,15 +112,19 @@ from brickql import ColumnOperand, ValueOperand, ParamOperand, FuncOperand, Case
 
 Describes your database structure: tables, columns (name, type, nullability), and named relationships. It is purely structural — no policy or access-control concerns. Loaded once at startup and shared across requests.
 
+Both `TableInfo` and `ColumnInfo` accept an optional `description` field. When present, descriptions are included in the LLM system prompt so the model can make better join and filter decisions without guessing from column names alone.
+
 ```python
 snapshot = SchemaSnapshot.model_validate({
     "tables": [
         {
             "name": "employees",
+            "description": "One row per employee. Joined to departments via department_id.",
             "columns": [
                 {"name": "employee_id", "type": "INTEGER", "nullable": False},
                 {"name": "tenant_id",   "type": "TEXT",    "nullable": False},
-                {"name": "first_name",  "type": "TEXT",    "nullable": False},
+                {"name": "status",      "type": "TEXT",    "nullable": True,
+                 "description": "Employment status. Values: ACTIVE, TERMINATED, ON_LEAVE."},
             ],
             "relationships": ["departments__employees"]
         }
@@ -136,6 +140,26 @@ snapshot = SchemaSnapshot.model_validate({
 > require runtime parameters and what those params are named is configured in
 > `PolicyConfig` via `TablePolicy`, not in the schema.
 
+#### Reflecting a schema from a live database
+
+Use `schema_from_sqlalchemy` to populate a `SchemaSnapshot` directly from an existing database instead of writing the JSON by hand:
+
+```python
+from sqlalchemy import create_engine
+from brickql import schema_from_sqlalchemy
+
+engine = create_engine("postgresql+psycopg://user:pass@localhost:5432/mydb")
+snapshot = schema_from_sqlalchemy(engine)
+```
+
+`schema_from_sqlalchemy` requires the `sqlalchemy` optional dependency:
+
+```bash
+pip install "brickql[sqlalchemy]"
+```
+
+The reflected snapshot is a starting point — add `description` fields and manually define any relationships that naming heuristics cannot detect, then save it to a JSON file for inspection and version control.
+
 ### DialectProfile — builder
 
 Compose exactly the SQL features you need. Each method is independent — no hidden stacking, no implicit dependencies:
@@ -145,10 +169,24 @@ Compose exactly the SQL features you need. Each method is independent — no hid
 | *(base)* | Single-table `SELECT` / `WHERE` / `LIMIT` | — |
 | `.joins(max_join_depth=2)` | `JOIN` (inner, left, self-referential, many-to-many), `ORDER BY`, `OFFSET`, `ILIKE` | — |
 | `.aggregations()` | `GROUP BY` / `HAVING` / `COUNT` `SUM` `AVG` `MIN` `MAX` / `CASE` | — |
+| `.scalar_functions(*funcs)` | Additional scalar functions by name (e.g. `DATE_PART`, `COALESCE`) | — |
 | `.subqueries()` | `EXISTS`, correlated and derived-table subqueries | — |
 | `.ctes()` | `WITH` / `WITH RECURSIVE` | **`.subqueries()`** |
 | `.set_operations()` | `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` | — |
 | `.window_functions()` | `ROW_NUMBER`, `RANK`, `LAG`, `LEAD`, `OVER`, `PARTITION BY` + aggregate window functions | **`.aggregations()`** |
+
+`.scalar_functions()` is additive and can be chained with any other method:
+
+```python
+profile = (
+    DialectProfile.builder(tables, target="postgres")
+    .aggregations()
+    .scalar_functions("DATE_PART", "COALESCE")
+    .ctes()
+    .subqueries()
+    .build()
+)
+```
 
 Dependencies are enforced at `build()` time with a `ProfileConfigError` and a clear message.
 
@@ -293,6 +331,31 @@ class MySQLCompiler(SQLCompiler):
 # Now you can use target="mysql" in DialectProfile.builder(...)
 ```
 
+#### Customising function compilation per dialect
+
+Override `build_func_call` to control how specific functions are rendered for your dialect — inline literal args, add type casts, rename functions, etc. The default renders `FUNC(arg1, arg2, …)`:
+
+```python
+from typing import Any, Callable
+
+@CompilerFactory.register("mysql")
+class MySQLCompiler(SQLCompiler):
+    # ... required abstract methods ...
+
+    def build_func_call(
+        self,
+        func_name: str,
+        args: list[Any],
+        build_arg: Callable[[Any], str],
+    ) -> str:
+        if func_name.upper() == "DATE_PART":
+            # MySQL uses YEAR(col) instead of DATE_PART('year', col)
+            return f"YEAR({build_arg(args[1])})"
+        return super().build_func_call(func_name, args, build_arg)
+```
+
+`build_arg` is a callback that compiles a single typed `Operand` to SQL, so the full operand chain (column quoting, param binding, nested functions) works correctly for any arg you forward.
+
 ### Adding a new operator
 
 Register a rendering handler; `OperatorRegistry` wires it in without touching the built-in `PredicateBuilder`:
@@ -363,7 +426,7 @@ brickql/
     expression_builder.py # RuntimeContext + OperandBuilder + PredicateBuilder
     clause_builders.py    # SelectClause / From / Join / Window / CTE / SetOp builders
     builder.py            # QueryBuilder — orchestrates all sub-builders
-    postgres.py           # PostgresCompiler  (%(name)s placeholders, ILIKE)
+    postgres.py           # PostgresCompiler  (%(name)s placeholders, ILIKE, DATE_PART specialisation)
     sqlite.py             # SQLiteCompiler    (:name placeholders, LIKE fallback)
   prompt/
     builder.py            # PromptBuilder + PromptComponents

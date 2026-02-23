@@ -34,7 +34,6 @@ def schema_from_sqlalchemy(
     *,
     include_tables: list[str] | None = None,
     schema: str | None = None,
-    infer_relationships: bool = False,
 ) -> SchemaSnapshot:
     """Build a :class:`SchemaSnapshot` by reflecting a SQLAlchemy engine.
 
@@ -58,17 +57,9 @@ def schema_from_sqlalchemy(
     Each table's ``relationships`` list contains every key in which that
     table participates (either as the referencing or the referenced side).
 
-    **Databases without FK constraints**
-
-    Many real-world databases omit ``FOREIGN KEY`` declarations even when
-    columns are semantically related (e.g. a ``defect_id TEXT`` column that
-    logically references ``defects.id``).  Pass ``infer_relationships=True``
-    to activate a naming-convention heuristic: for every column whose name
-    ends with ``_id``, the converter looks for a table named ``{prefix}`` or
-    ``{prefix}s`` (where ``prefix`` is the part before ``_id``) that has an
-    ``id`` column.  When found, a relationship is created automatically.  For
-    finer control, call :func:`infer_relationships_from_names` on a snapshot
-    you have already loaded or hand-edited.
+    For databases that omit ``FOREIGN KEY`` declarations, relationships must
+    be added manually to the returned snapshot (or its JSON representation)
+    before use.
 
     Args:
         engine: A connected :class:`sqlalchemy.engine.Engine` instance.
@@ -77,9 +68,6 @@ def schema_from_sqlalchemy(
         schema: Optional database schema name (e.g. ``"public"`` for
             PostgreSQL).  Passed directly to
             :meth:`sqlalchemy.schema.MetaData.reflect`.
-        infer_relationships: When ``True``, relationships are inferred from
-            column naming conventions in addition to explicit FK constraints.
-            Defaults to ``False``.
 
     Returns:
         A fully populated :class:`SchemaSnapshot`.
@@ -92,9 +80,8 @@ def schema_from_sqlalchemy(
         from sqlalchemy import create_engine
         from brickql.schema.converters import schema_from_sqlalchemy
 
-        # Database with no FK constraints — use naming heuristic
         engine = create_engine("postgresql+psycopg://user:pw@host/db")
-        snapshot = schema_from_sqlalchemy(engine, infer_relationships=True)
+        snapshot = schema_from_sqlalchemy(engine)
     """
     try:
         from sqlalchemy import MetaData as _MetaData
@@ -108,10 +95,7 @@ def schema_from_sqlalchemy(
     with engine.connect() as conn:
         metadata.reflect(bind=conn, only=include_tables, schema=schema)
 
-    snapshot = _metadata_to_snapshot(metadata)
-    if infer_relationships:
-        snapshot = infer_relationships_from_names(snapshot)
-    return snapshot
+    return _metadata_to_snapshot(metadata)
 
 
 # ---------------------------------------------------------------------------
@@ -182,121 +166,6 @@ def _metadata_to_snapshot(metadata: MetaData) -> SchemaSnapshot:
     ]
 
     return SchemaSnapshot(tables=tables, relationships=all_relationships)
-
-
-def infer_relationships_from_names(snapshot: SchemaSnapshot) -> SchemaSnapshot:
-    """Return a new :class:`SchemaSnapshot` with relationships inferred from
-    column naming conventions.
-
-    For every column whose name ends with ``_id``, the function tries the
-    following candidate parent tables in order:
-
-    1. A table named exactly ``{prefix}`` (where ``prefix`` is the part
-       before ``_id``).
-    2. A table named ``{prefix}s`` (naive pluralisation).
-
-    When a candidate table is found **and** it has a column named ``id``,
-    a relationship is created following the standard BrickQL key convention
-    ``{referenced_table}__{referencing_table}``.  If the same pair would
-    produce a duplicate key, the FK column name is appended:
-    ``{referenced_table}__{referencing_table}__{fk_col}``.
-
-    Relationships already present in the snapshot are preserved; only new
-    ones are added.
-
-    This function is most useful for databases that omit ``FOREIGN KEY``
-    constraints at the DDL level.  For databases with proper FK declarations,
-    :func:`schema_from_sqlalchemy` already extracts them automatically.
-
-    Args:
-        snapshot: The snapshot to enrich.  The original object is not mutated.
-
-    Returns:
-        A new :class:`SchemaSnapshot` with any inferred relationships merged in.
-
-    Example::
-
-        import json
-        from brickql import SchemaSnapshot
-        from brickql.schema.converters import infer_relationships_from_names
-
-        snapshot = SchemaSnapshot.model_validate(json.loads(open("schema.json").read()))
-        enriched = infer_relationships_from_names(snapshot)
-    """
-    table_map = {t.name: t for t in snapshot.tables}
-    existing_keys = set(snapshot.relationship_keys)
-
-    # Count inferred (from_table, to_table) pairs to detect collisions.
-    inferred_pair_count: dict[tuple[str, str], int] = defaultdict(int)
-    for table in snapshot.tables:
-        seen_pairs: set[tuple[str, str]] = set()
-        for col in table.columns:
-            if not col.name.endswith("_id"):
-                continue
-            to_table = _resolve_candidate_table(col.name[:-3], table_map)
-            if to_table and (table.name, to_table) not in seen_pairs:
-                inferred_pair_count[(table.name, to_table)] += 1
-                seen_pairs.add((table.name, to_table))
-
-    new_relationships: list[RelationshipInfo] = []
-    extra_rel_keys: dict[str, list[str]] = defaultdict(list)
-
-    for table in snapshot.tables:
-        for col in table.columns:
-            if not col.name.endswith("_id"):
-                continue
-            to_table = _resolve_candidate_table(col.name[:-3], table_map)
-            if to_table is None:
-                continue
-
-            key = _rel_key(table.name, col.name, to_table, inferred_pair_count)
-            if key in existing_keys:
-                continue
-
-            existing_keys.add(key)
-            new_relationships.append(
-                RelationshipInfo(
-                    key=key,
-                    from_table=table.name,
-                    from_col=col.name,
-                    to_table=to_table,
-                    to_col="id",
-                )
-            )
-            extra_rel_keys[table.name].append(key)
-            if to_table != table.name:
-                extra_rel_keys[to_table].append(key)
-
-    if not new_relationships:
-        return snapshot
-
-    updated_tables = [
-        TableInfo(
-            name=t.name,
-            columns=t.columns,
-            relationships=list(t.relationships) + extra_rel_keys.get(t.name, []),
-        )
-        for t in snapshot.tables
-    ]
-    return SchemaSnapshot(
-        tables=updated_tables,
-        relationships=list(snapshot.relationships) + new_relationships,
-    )
-
-
-def _resolve_candidate_table(
-    prefix: str, table_map: dict[str, TableInfo]
-) -> str | None:
-    """Return the first matching table name for a ``{prefix}_id`` column.
-
-    Tries ``prefix`` verbatim, then ``prefix + "s"`` (naive pluralisation).
-    The candidate is only accepted when it has a column named ``id``.
-    """
-    for candidate in (prefix, prefix + "s"):
-        table = table_map.get(candidate)
-        if table is not None and "id" in table.column_names:
-            return candidate
-    return None
 
 
 def _rel_key(
