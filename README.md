@@ -171,7 +171,7 @@ Compose exactly the SQL features you need. Each method is independent — no hid
 | `.aggregations()` | `GROUP BY` / `HAVING` / `COUNT` `SUM` `AVG` `MIN` `MAX` / `CASE` | — |
 | `.scalar_functions(*funcs)` | Additional scalar functions by name (e.g. `DATE_PART`, `COALESCE`) | — |
 | `.subqueries()` | `EXISTS`, correlated and derived-table subqueries | — |
-| `.ctes()` | `WITH` / `WITH RECURSIVE` | **`.subqueries()`** |
+| `.ctes()` | `WITH` / `WITH RECURSIVE` — CTEs (Common Table Expressions: named temporary result sets scoped to the query) | **`.subqueries()`** |
 | `.set_operations()` | `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` | — |
 | `.window_functions()` | `ROW_NUMBER`, `RANK`, `LAG`, `LEAD`, `OVER`, `PARTITION BY` + aggregate window functions | **`.aggregations()`** |
 
