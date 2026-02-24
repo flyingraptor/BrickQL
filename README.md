@@ -480,11 +480,14 @@ make typecheck
 # Unit tests only (no database required)
 make test-unit
 
-# Unit + SQLite integration tests (in-memory, no Docker)
-make test
+# SQLite integration tests only (in-memory, no Docker)
+make test-integration-sqlite
 
-# All tests including PostgreSQL (requires Docker)
+# PostgreSQL integration tests only (starts and stops Docker automatically)
 make test-integration-postgres
+
+# All tests — unit + SQLite + PostgreSQL (requires Docker)
+make test
 ```
 
 ---
