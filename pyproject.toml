@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brickql"
-version = "0.1.0"
+version = "0.1.2"
 description = "Policy-driven, SQL-standard-aligned query orchestration framework for LLM planners."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-keywords = ["sql", "llm", "query", "orchestration", "policy"]
+keywords = ["sql", "llm", "query", "orchestration", "policy", "ai", "nlp", "rag", "pydantic", "sqlite", "postgresql"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -17,8 +17,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
     "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Development Status :: 4 - Beta",
 ]
 dependencies = [
     "pydantic>=2.12",
@@ -57,8 +60,10 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/flyingraptor/BrickQL"
-"Bug Tracker" = "https://github.com/flyingraptor/BrickQL/issues"
+"Homepage" = "https://brickql.org"
+"Documentation" = "https://brickql.org"
+"Source" = "https://github.com/flyingraptor/BrickSQL"
+"Bug Tracker" = "https://github.com/flyingraptor/BrickSQL/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
