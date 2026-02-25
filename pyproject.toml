@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brickql"
-version = "0.1.2"
+version = "0.1.3"
 description = "Policy-driven, SQL-standard-aligned query orchestration framework for LLM planners."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -62,8 +62,8 @@ dev = [
 [project.urls]
 "Homepage" = "https://brickql.org"
 "Documentation" = "https://brickql.org"
-"Source" = "https://github.com/flyingraptor/BrickSQL"
-"Bug Tracker" = "https://github.com/flyingraptor/BrickSQL/issues"
+"Source" = "https://github.com/flyingraptor/BrickQL"
+"Bug Tracker" = "https://github.com/flyingraptor/BrickQL/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
