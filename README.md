@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/logo.svg" alt="brickQL" width="420" />
+  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/logo.png" alt="brickQL" width="420" />
 </p>
 
 # Description
