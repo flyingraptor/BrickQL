@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/logo.png" alt="brickQL" width="420" />
+  <img src="logo.png" alt="brickQL" width="420" />
 </p>
 
 # Description
@@ -15,7 +15,7 @@ brickQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JS
 ## How it works
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/docs/how-it-works.png" alt="brickQL flow diagram" width="500" />
+  <img src="docs/how-it-works.png" alt="brickQL flow diagram" width="500" />
 </p>
 
 ---
