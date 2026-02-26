@@ -2,13 +2,29 @@
   <img src="logo.png" alt="brickQL" width="420" />
 </p>
 
-# Description
+# Text to brickQL
 
-**Policy-driven, SQL-standard-aligned query orchestration for LLM planners.**
+**Policy-driven, SQL-standard-aligned query orchestration for LLMs.**
 
-> Build Queries. Don't Generate Them.
+> The Building Blocks of Safe SQL.
 
 brickQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JSON)**; brickQL validates it against your schema, enforces policy rules, and compiles it to safe, parameterized SQL. Raw SQL never touches the LLM.
+
+---
+
+## Why not Text-to-SQL?
+
+Text-to-SQL is a well-established approach: feed the LLM a natural-language question and a schema, and let it write the SQL directly. It works well for simple queries and controlled environments, but breaks down as soon as real-world constraints appear:
+
+| Challenge | Why it hurts |
+|---|---|
+| **Hallucinated syntax** | LLMs invent column names, functions, or dialect-specific constructs that don't exist in your database, causing runtime errors that are hard to debug at scale. |
+| **No policy enforcement** | There is no layer between the generated SQL and the database. Row-level filters, param-bound column constraints, and column allowlists must be bolted on externally, and can silently fail. |
+| **Prompt-injection surface** | The LLM sees and reasons over raw SQL strings. Malicious content in user input or database values can redirect the query, exfiltrate data, or trigger destructive operations. |
+| **Non-deterministic repairs** | When a query fails, the LLM must re-generate free-form SQL, each attempt is a new coin flip with the same attack surface. |
+| **Dialect fragility** | SQL is not a single language. A query that works on PostgreSQL may silently mis-behave on SQLite or MySQL; the LLM has no mechanism to stay within a safe dialect subset. |
+
+brickQL addresses each of these by moving the LLM out of the SQL-generation path entirely. The LLM reasons in a structured, schema-aware **QueryPlan (JSON)**; brickQL owns the compilation step, enforces every policy rule, and emits parameterized SQL that never flows back to the model.
 
 ---
 
@@ -30,7 +46,7 @@ Among its ten case studies, §4.2 examines SQL agents under a threat model where
 |---|---|
 | **Plan-Then-Execute** — LLM commits to a query plan *before* any database data is returned to it, so database contents can never inject new instructions | The LLM outputs a `QueryPlan` JSON; brickQL validates and compiles it to SQL without ever feeding query results back to the LLM |
 | **Strict output formatting** — constrain the LLM to a well-specified format rather than free-form SQL | `QueryPlan` is a typed Pydantic model; free-form SQL is structurally impossible |
-| **Least-privilege access control** — restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound tenant columns |
+| **Least-privilege access control** — restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound columns |
 | **Parameterized execution** — prevent SQL injection from literal values in the plan | All `{"value": …}` operands are compiled to named placeholders; no string interpolation occurs anywhere in the compilation path |
 
 The OR-bypass hardening in `PolicyEngine._where_satisfies_param` (which ensures a param-bound column cannot be satisfied by placing the required predicate inside an `OR` branch) and the `build_repair_prompt` sanitization (which re-serializes the previous plan through `json.loads` / `json.dumps` before feeding it back to the LLM) are direct responses to security risks identified through the paper's threat model.
