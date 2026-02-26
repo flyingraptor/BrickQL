@@ -1,4 +1,4 @@
-"""Prompt builder: constructs system and user prompts for LLM planners.
+"""Prompt builder: constructs system and user prompts for LLMs.
 
 The LLM receives three structured inputs:
 1. **Schema Snapshot** – tables, columns, and relationship keys it may use.

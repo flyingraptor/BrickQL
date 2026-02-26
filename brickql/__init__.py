@@ -1,4 +1,4 @@
-"""brickQL – Policy-driven SQL query orchestration for LLM planners.
+"""brickQL – Policy-driven SQL query orchestration for LLMs.
 
 Build Queries. Don't Generate Them.
 
