@@ -1,7 +1,7 @@
 """Semantic / business-rule validator.
 
 Validates rules that are not purely structural (schema existence) or
-purely dialect-based (feature flags) — e.g. HAVING requires GROUP BY,
+purely dialect-based (feature flags) - e.g. HAVING requires GROUP BY,
 LIMIT must be a positive integer within the dialect's maximum.
 """
 

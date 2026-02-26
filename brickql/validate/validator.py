@@ -6,18 +6,18 @@ focused sub-validators and drives validation in the correct order.
 Sub-validator hierarchy
 -----------------------
 PlanValidator
-  ├── DialectValidator    (dialect_validator.py)  — feature-flag checks
-  ├── SchemaValidator     (schema_validator.py)   — table / column existence
-  ├── SemanticValidator   (semantic_validator.py) — HAVING / LIMIT rules
-  ├── OperandValidator    (operand_validator.py)  — typed operand checks
-  └── PredicateValidator  (operand_validator.py)  — predicate dict checks
+  ├── DialectValidator    (dialect_validator.py)  - feature-flag checks
+  ├── SchemaValidator     (schema_validator.py)   - table / column existence
+  ├── SemanticValidator   (semantic_validator.py) - HAVING / LIMIT rules
+  ├── OperandValidator    (operand_validator.py)  - typed operand checks
+  └── PredicateValidator  (operand_validator.py)  - predicate dict checks
 
-Item 11 — Inappropriate Intimacy fix: recursive sub-validation (for
+Item 11 - Inappropriate Intimacy fix: recursive sub-validation (for
 subqueries, CTEs, set-ops) no longer hard-codes ``PlanValidator(…)``.
 A ``sub_validator_factory`` is used instead; the default replicates the
 old behaviour and callers may inject a custom factory.
 
-Item 6 — Data Clumps fix: ``(snapshot, dialect)`` is packaged into the
+Item 6 - Data Clumps fix: ``(snapshot, dialect)`` is packaged into the
 :class:`~brickql.schema.context.ValidationContext` value object and
 threaded to every sub-validator.
 """

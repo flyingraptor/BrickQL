@@ -213,7 +213,7 @@ def test_repair_prompt_includes_error():
 
 
 # ---------------------------------------------------------------------------
-# build_repair_prompt — tainted-context sanitization tests
+# build_repair_prompt - tainted-context sanitization tests
 # ---------------------------------------------------------------------------
 
 

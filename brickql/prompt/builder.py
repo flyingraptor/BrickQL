@@ -29,7 +29,7 @@ You are a query planner for a SQL database.
 - Do NOT invent tables, columns, or relationship keys.
 - Do NOT hardcode tenant IDs or other runtime values; use {{"param": "PARAM_NAME"}}.
 
-## Exact output format — follow this precisely
+## Exact output format - follow this precisely
 
 Top-level keys (omit unused): SELECT, FROM, JOIN, WHERE, GROUP_BY, HAVING,
 ORDER_BY, LIMIT, OFFSET, SET_OP, CTE
@@ -39,14 +39,14 @@ A JSON array where EVERY item is an object with an "expr" key:
   {{"expr": {{"col": "table.column"}}}}
   {{"expr": {{"col": "table.column"}}, "alias": "my_alias"}}
   {{"expr": {{"func": "COUNT", "args": [{{"col": "t.id"}}]}}, "alias": "cnt"}}
-NEVER write {{"col": "..."}} directly as a SELECT item — it MUST be wrapped in {{"expr": ...}}.
+NEVER write {{"col": "..."}} directly as a SELECT item - it MUST be wrapped in {{"expr": ...}}.
 
 ### FROM
-Always an object with a "table" key — NEVER a plain string:
+Always an object with a "table" key - NEVER a plain string:
   {{"table": "employees"}}
 
 ### LIMIT
-Always an object with a "value" key — NEVER a plain integer:
+Always an object with a "value" key - NEVER a plain integer:
   {{"value": 50}}
 
 ### OFFSET

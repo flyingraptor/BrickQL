@@ -75,7 +75,7 @@ from brickql.schema.snapshot import (
 from brickql.validate.validator import PlanValidator
 
 # ---------------------------------------------------------------------------
-# Register built-in compilers with CompilerFactory (Item 4 — OCP)
+# Register built-in compilers with CompilerFactory (Item 4 - OCP)
 # ---------------------------------------------------------------------------
 
 CompilerFactory.register_class("postgres", PostgresCompiler)
@@ -185,7 +185,7 @@ def validate_and_compile(
     # 3. Apply policy
     plan = PolicyEngine(policy, snapshot, dialect).apply(plan)
 
-    # 4. Compile — dialect target resolved via CompilerFactory (OCP: no if-chain)
+    # 4. Compile - dialect target resolved via CompilerFactory (OCP: no if-chain)
     compiler = CompilerFactory.create(dialect.target)
     return QueryBuilder(compiler, snapshot).build(plan)
 

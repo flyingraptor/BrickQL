@@ -1,8 +1,8 @@
 """Operand and predicate validators.
 
-``OperandValidator`` and ``PredicateValidator`` are tightly coupled —
+``OperandValidator`` and ``PredicateValidator`` are tightly coupled -
 CASE operands contain predicate conditions, and predicates contain
-operands — so they share a module.
+operands - so they share a module.
 
 Both receive a :class:`~brickql.schema.context.ValidationContext` and a
 :attr:`cte_names` frozenset that grows as the outer query discovers CTE
@@ -119,7 +119,7 @@ class OperandValidator:
         """Validate a ``table.column`` or bare ``column`` reference."""
         ref = ColumnReference.parse(col)
         if ref.table is None:
-            return  # Bare column — validated contextually by caller.
+            return  # Bare column - validated contextually by caller.
 
         self._assert_table_allowed(ref.table)
         if ref.table in self._cte_names:

@@ -248,7 +248,7 @@ class TestSelfReferentialFK:
 
 
 # ---------------------------------------------------------------------------
-# Multiple FKs to same parent — disambiguation
+# Multiple FKs to same parent - disambiguation
 # ---------------------------------------------------------------------------
 
 
@@ -316,7 +316,7 @@ class TestIncludeTablesFilter:
 
 
 # ---------------------------------------------------------------------------
-# Column type strings — VARCHAR and other non-affinity types
+# Column type strings - VARCHAR and other non-affinity types
 # ---------------------------------------------------------------------------
 
 

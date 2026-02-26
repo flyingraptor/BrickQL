@@ -236,7 +236,7 @@ def test_no_default_limit_injected_when_zero():
 
 
 # ---------------------------------------------------------------------------
-# allowed_columns — positive column allowlist
+# allowed_columns - positive column allowlist
 # ---------------------------------------------------------------------------
 
 
@@ -320,12 +320,12 @@ def test_allowed_columns_blocked_in_where_clause():
 
 
 # ---------------------------------------------------------------------------
-# _where_satisfies_param — OR-bypass security tests
+# _where_satisfies_param - OR-bypass security tests
 # ---------------------------------------------------------------------------
 
 
 def test_param_nested_in_and_satisfies_binding():
-    """A param binding inside AND must satisfy the check — no re-injection needed."""
+    """A param binding inside AND must satisfy the check - no re-injection needed."""
     where = {
         "AND": [
             {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},

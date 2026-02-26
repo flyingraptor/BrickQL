@@ -16,7 +16,7 @@ Runtime policy is configured entirely in :class:`PolicyConfig` and
 :class:`TablePolicy`.  The :class:`~brickql.schema.snapshot.SchemaSnapshot`
 remains a pure structural description of the database; it carries no policy.
 
-Example — per-role column allowlist (RBAC pattern)::
+Example - per-role column allowlist (RBAC pattern)::
 
     analyst_policy = PolicyConfig(
         inject_missing_params=True,
@@ -59,10 +59,10 @@ class TablePolicy:
             must use.  For example ``{"tenant_id": "TENANT"}`` requires every
             predicate on ``tenant_id`` to use ``{"param": "TENANT"}`` rather
             than a literal value.  Different tables can use different param
-            names — or the same name if the runtime value is shared.
+            names - or the same name if the runtime value is shared.
         allowed_columns: Positive allowlist of column names that may appear in
             any plan referencing this table.  When non-empty, **only** the
-            listed columns are permitted — any other column is blocked with
+            listed columns are permitted - any other column is blocked with
             :class:`~brickql.errors.DisallowedColumnError`.  An empty list
             (the default) means all columns are allowed (subject to
             ``denied_columns``).  Useful for RBAC patterns where a role should
@@ -127,7 +127,7 @@ class PolicyEngine:
 
     Args:
         config: Policy rules for this request.
-        snapshot: Schema snapshot (structural metadata only — no policy).
+        snapshot: Schema snapshot (structural metadata only - no policy).
         dialect: Dialect profile (for max_limit enforcement).
     """
 
@@ -301,7 +301,7 @@ class PolicyEngine:
             ):
                 return True
         # Only recurse into AND: a binding inside OR does not guarantee the
-        # column is filtered — the OR branch makes the restriction optional,
+        # column is filtered - the OR branch makes the restriction optional,
         # which would allow cross-tenant access.
         if op == "AND" and isinstance(args, list):
             return any(self._where_satisfies_param(sub, col_ref, param_name) for sub in args)

@@ -49,9 +49,9 @@ def schema_from_sqlalchemy(
     Two situations require disambiguation with the FK column name
     (``{referenced_table}__{referencing_table}__{fk_col}``):
 
-    * **Self-referential FK** — the table references itself (e.g.
+    * **Self-referential FK** - the table references itself (e.g.
       ``employees.manager_id → employees.employee_id``).
-    * **Multiple FKs to the same parent** — a table has two or more FK
+    * **Multiple FKs to the same parent** - a table has two or more FK
       columns pointing to the same parent table.
 
     Each table's ``relationships`` list contains every key in which that

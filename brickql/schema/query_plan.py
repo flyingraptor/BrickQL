@@ -210,13 +210,13 @@ class QueryPlan(BaseModel):
     CTE: list[CTEClause] | None = None
 
     # ------------------------------------------------------------------
-    # Domain methods (Item 7 — Anemic Domain Model fix)
+    # Domain methods (Item 7 - Anemic Domain Model fix)
     # ------------------------------------------------------------------
 
     def collect_table_references(self) -> set[str]:
         """Collect direct table names referenced in FROM.
 
-        Does not resolve JOIN relationship keys — callers that need
+        Does not resolve JOIN relationship keys - callers that need
         JOIN-resolved tables should use :meth:`collect_joined_tables`.
 
         Returns:
@@ -278,7 +278,7 @@ def _collect_from_pred_or_operand(node: Any, refs: list[str]) -> None:
     if isinstance(node, (ColumnOperand, FuncOperand, CaseOperand)):
         _collect_from_operand(node, refs)
     elif isinstance(node, dict):
-        # Could be a predicate dict or a legacy operand dict — handle both.
+        # Could be a predicate dict or a legacy operand dict - handle both.
         if "col" in node:
             refs.append(node["col"])
         elif "func" in node:

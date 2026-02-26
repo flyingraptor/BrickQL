@@ -25,7 +25,7 @@ every nested sub-plan (CTEs, SET_OP branches, FROM subqueries, correlated
 EXISTS / IN subqueries).  This ensures literal parameter names are globally
 unique across the whole statement.
 
-Item 11 — Inappropriate Intimacy fix
+Item 11 - Inappropriate Intimacy fix
 -------------------------------------
 The ``subquery_factory`` parameter lets callers inject a custom
 :class:`QueryBuilder` factory for testing or specialisation, replacing the

@@ -135,8 +135,8 @@ class SchemaError(ValidationError):
 class ProfileConfigError(brickQLError):
     """Raised when a DialectProfile is misconfigured.
 
-    Detected at :meth:`DialectProfileBuilder.build` time — before any query
-    is executed — so the developer gets a clear, actionable message instead
+    Detected at :meth:`DialectProfileBuilder.build` time - before any query
+    is executed - so the developer gets a clear, actionable message instead
     of a cryptic validation failure later.
 
     Args:

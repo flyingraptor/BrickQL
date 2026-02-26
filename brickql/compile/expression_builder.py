@@ -1,7 +1,7 @@
 """Operand and predicate SQL compilers.
 
-``OperandBuilder`` and ``PredicateBuilder`` are tightly coupled — CASE
-operands contain predicate conditions, and predicates contain operands —
+``OperandBuilder`` and ``PredicateBuilder`` are tightly coupled - CASE
+operands contain predicate conditions, and predicates contain operands -
 so they share a module.
 
 Both classes receive a :class:`~brickql.compile.context.CompilationContext`

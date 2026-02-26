@@ -582,7 +582,7 @@ def test_p6_union_all_active_inactive(pg_conn):
 
 
 # ---------------------------------------------------------------------------
-# Policy — allowed_columns (column allowlist / RBAC pattern)
+# Policy - allowed_columns (column allowlist / RBAC pattern)
 # ---------------------------------------------------------------------------
 
 _ANALYST_POLICY = PolicyConfig(

@@ -23,7 +23,7 @@ class PostgresCompiler(SQLCompiler):
         return f"%({name})s"
 
     def like_operator(self, op: str) -> str:
-        return op  # 'LIKE' or 'ILIKE' — PostgreSQL supports both natively
+        return op  # 'LIKE' or 'ILIKE' - PostgreSQL supports both natively
 
     def quote_identifier(self, name: str) -> str:
         escaped = name.replace('"', '""')

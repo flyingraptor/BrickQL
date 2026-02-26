@@ -44,10 +44,10 @@ Among its ten case studies, §4.2 examines SQL agents under a threat model where
 
 | Paper recommendation | brickQL implementation |
 |---|---|
-| **Plan-Then-Execute** — LLM commits to a query plan *before* any database data is returned to it, so database contents can never inject new instructions | The LLM outputs a `QueryPlan` JSON; brickQL validates and compiles it to SQL without ever feeding query results back to the LLM |
-| **Strict output formatting** — constrain the LLM to a well-specified format rather than free-form SQL | `QueryPlan` is a typed Pydantic model; free-form SQL is structurally impossible |
-| **Least-privilege access control** — restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound columns |
-| **Parameterized execution** — prevent SQL injection from literal values in the plan | All `{"value": …}` operands are compiled to named placeholders; no string interpolation occurs anywhere in the compilation path |
+| **Plan-Then-Execute** - LLM commits to a query plan *before* any database data is returned to it, so database contents can never inject new instructions | The LLM outputs a `QueryPlan` JSON; brickQL validates and compiles it to SQL without ever feeding query results back to the LLM |
+| **Strict output formatting** - constrain the LLM to a well-specified format rather than free-form SQL | `QueryPlan` is a typed Pydantic model; free-form SQL is structurally impossible |
+| **Least-privilege access control** - restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound columns |
+| **Parameterized execution** - prevent SQL injection from literal values in the plan | All `{"value": …}` operands are compiled to named placeholders; no string interpolation occurs anywhere in the compilation path |
 
 The OR-bypass hardening in `PolicyEngine._where_satisfies_param` (which ensures a param-bound column cannot be satisfied by placing the required predicate inside an `OR` branch) and the `build_repair_prompt` sanitization (which re-serializes the previous plan through `json.loads` / `json.dumps` before feeding it back to the LLM) are direct responses to security risks identified through the paper's threat model.
 
@@ -100,7 +100,7 @@ plan_json = llm_response  # {"SELECT": [...], "FROM": {...}, "JOIN": [...], ...}
 
 compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
 
-# 5. Execute with your own connection — brickQL does not execute queries
+# 5. Execute with your own connection - brickQL does not execute queries
 cursor.execute(compiled.sql, compiled.merge_runtime_params({"TENANT": tenant_id}))
 ```
 
@@ -110,7 +110,7 @@ cursor.execute(compiled.sql, compiled.merge_runtime_params({"TENANT": tenant_id}
 
 ### QueryPlan JSON
 
-The only output the LLM must produce. A structured, SQL-grammar-aligned JSON object — never raw SQL.
+The only output the LLM must produce. A structured, SQL-grammar-aligned JSON object - never raw SQL.
 
 ```json
 {
@@ -143,7 +143,7 @@ from brickql import ColumnOperand, ValueOperand, ParamOperand, FuncOperand, Case
 
 ### SchemaSnapshot
 
-Describes your database structure: tables, columns (name, type, nullability), and named relationships. It is purely structural — no policy or access-control concerns. Loaded once at startup and shared across requests.
+Describes your database structure: tables, columns (name, type, nullability), and named relationships. It is purely structural - no policy or access-control concerns. Loaded once at startup and shared across requests.
 
 Both `TableInfo` and `ColumnInfo` accept an optional `description` field. When present, descriptions are included in the LLM system prompt so the model can make better join and filter decisions without guessing from column names alone.
 
@@ -169,7 +169,7 @@ snapshot = SchemaSnapshot.model_validate({
 })
 ```
 
-> **Note** — `tenant_id` is just a regular column in the snapshot. Which columns
+> **Note** - `tenant_id` is just a regular column in the snapshot. Which columns
 > require runtime parameters and what those params are named is configured in
 > `PolicyConfig` via `TablePolicy`, not in the schema.
 
@@ -191,21 +191,21 @@ snapshot = schema_from_sqlalchemy(engine)
 pip install "brickql[sqlalchemy]"
 ```
 
-The reflected snapshot is a starting point — add `description` fields and manually define any relationships that naming heuristics cannot detect, then save it to a JSON file for inspection and version control.
+The reflected snapshot is a starting point - add `description` fields and manually define any relationships that naming heuristics cannot detect, then save it to a JSON file for inspection and version control.
 
-### DialectProfile — builder
+### DialectProfile - builder
 
-Compose exactly the SQL features you need. Each method is independent — no hidden stacking, no implicit dependencies:
+Compose exactly the SQL features you need. Each method is independent - no hidden stacking, no implicit dependencies:
 
 | Builder method | SQL capabilities unlocked | Requires |
 |---|---|---|
-| *(base)* | Single-table `SELECT` / `WHERE` / `LIMIT` | — |
-| `.joins(max_join_depth=2)` | `JOIN` (inner, left, self-referential, many-to-many), `ORDER BY`, `OFFSET`, `ILIKE` | — |
-| `.aggregations()` | `GROUP BY` / `HAVING` / `COUNT` `SUM` `AVG` `MIN` `MAX` / `CASE` | — |
-| `.scalar_functions(*funcs)` | Additional scalar functions by name (e.g. `DATE_PART`, `COALESCE`) | — |
-| `.subqueries()` | `EXISTS`, correlated and derived-table subqueries | — |
-| `.ctes()` | `WITH` / `WITH RECURSIVE` — CTEs (Common Table Expressions: named temporary result sets scoped to the query) | **`.subqueries()`** |
-| `.set_operations()` | `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` | — |
+| *(base)* | Single-table `SELECT` / `WHERE` / `LIMIT` | - |
+| `.joins(max_join_depth=2)` | `JOIN` (inner, left, self-referential, many-to-many), `ORDER BY`, `OFFSET`, `ILIKE` | - |
+| `.aggregations()` | `GROUP BY` / `HAVING` / `COUNT` `SUM` `AVG` `MIN` `MAX` / `CASE` | - |
+| `.scalar_functions(*funcs)` | Additional scalar functions by name (e.g. `DATE_PART`, `COALESCE`) | - |
+| `.subqueries()` | `EXISTS`, correlated and derived-table subqueries | - |
+| `.ctes()` | `WITH` / `WITH RECURSIVE` - CTEs (Common Table Expressions: named temporary result sets scoped to the query) | **`.subqueries()`** |
+| `.set_operations()` | `UNION` / `UNION ALL` / `INTERSECT` / `EXCEPT` | - |
 | `.window_functions()` | `ROW_NUMBER`, `RANK`, `LAG`, `LEAD`, `OVER`, `PARTITION BY` + aggregate window functions | **`.aggregations()`** |
 
 `.scalar_functions()` is additive and can be chained with any other method:
@@ -256,7 +256,7 @@ profile = (
 ### PolicyConfig and TablePolicy
 
 `PolicyConfig` controls the overall request policy. `TablePolicy` configures
-per-table rules — each table can have its own param-bound columns, a positive
+per-table rules - each table can have its own param-bound columns, a positive
 column allowlist, and/or a denied column list.
 
 ```python
@@ -277,7 +277,7 @@ policy = PolicyConfig(
 )
 ```
 
-#### Column allowlist — RBAC pattern
+#### Column allowlist - RBAC pattern
 
 `allowed_columns` is a **positive allowlist**: when non-empty, only the listed
 columns may appear in any plan referencing that table. This maps directly to
@@ -345,7 +345,7 @@ response = llm.chat(system=components.system_prompt, user=components.user_prompt
 
 ## Error handling
 
-All errors are subclasses of `brickQLError` and carry a machine-readable `code` and `details` dict — designed for LLM repair loops.
+All errors are subclasses of `brickQLError` and carry a machine-readable `code` and `details` dict - designed for LLM repair loops.
 
 ```python
 from brickql import ParseError, ValidationError, CompilationError
@@ -356,7 +356,7 @@ except ParseError as e:
     # Malformed JSON or invalid QueryPlan structure
     pass
 except ValidationError as e:
-    # Schema or dialect rule violated — pass e.to_error_response() back to LLM
+    # Schema or dialect rule violated - pass e.to_error_response() back to LLM
     pass
 except CompilationError as e:
     raise
@@ -394,7 +394,7 @@ class MySQLCompiler(SQLCompiler):
 
 #### Customising function compilation per dialect
 
-Override `build_func_call` to control how specific functions are rendered for your dialect — inline literal args, add type casts, rename functions, etc. The default renders `FUNC(arg1, arg2, …)`:
+Override `build_func_call` to control how specific functions are rendered for your dialect - inline literal args, add type casts, rename functions, etc. The default renders `FUNC(arg1, arg2, …)`:
 
 ```python
 from typing import Any, Callable
@@ -437,10 +437,10 @@ def _regexp_handler(op, args, build_operand):
 
 | Limitation | Workaround |
 |---|---|
-| **Scalar subqueries in comparison operators** — `salary > (SELECT AVG(salary) …)` is not a supported operand type. | Use a window-function CTE: compute `AVG(salary) OVER ()` inside the CTE so every row carries the aggregate, then filter on that result column in the outer query. See the example below. |
-| **JOIN alias column references** — column references in SELECT / WHERE must use the original table name, not a JOIN alias. The exception is CTE names, which can be used as table qualifiers. | Use the real table name in all column references; aliases are only for output renaming. |
+| **Scalar subqueries in comparison operators** - `salary > (SELECT AVG(salary) …)` is not a supported operand type. | Use a window-function CTE: compute `AVG(salary) OVER ()` inside the CTE so every row carries the aggregate, then filter on that result column in the outer query. See the example below. |
+| **JOIN alias column references** - column references in SELECT / WHERE must use the original table name, not a JOIN alias. The exception is CTE names, which can be used as table qualifiers. | Use the real table name in all column references; aliases are only for output renaming. |
 
-**Scalar subquery workaround — window-function CTE**
+**Scalar subquery workaround - window-function CTE**
 
 Goal: *list employees whose salary is above the overall average.*
 
@@ -502,7 +502,7 @@ make test-integration-sqlite
 # PostgreSQL integration tests only (starts and stops Docker automatically)
 make test-integration-postgres
 
-# All tests — unit + SQLite + PostgreSQL (requires Docker)
+# All tests - unit + SQLite + PostgreSQL (requires Docker)
 make test
 ```
 
@@ -518,10 +518,10 @@ brickql/
     query_plan.py         # QueryPlan Pydantic model + domain methods (collect_col_refs, …)
     snapshot.py           # SchemaSnapshot, TableInfo, ColumnInfo, RelationshipInfo
     dialect.py            # DialectProfile + DialectProfileBuilder (fluent API)
-    column_reference.py   # ColumnReference — parse + validate table.column strings
+    column_reference.py   # ColumnReference - parse + validate table.column strings
     context.py            # ValidationContext value object (snapshot + dialect)
   validate/
-    validator.py          # PlanValidator — orchestrates all sub-validators
+    validator.py          # PlanValidator - orchestrates all sub-validators
     dialect_validator.py  # Feature-flag checks (CTE, subquery, join depth, window)
     schema_validator.py   # Table / column existence, JOIN relationship keys
     semantic_validator.py # HAVING/GROUP_BY pairing, LIMIT range
@@ -534,7 +534,7 @@ brickql/
     context.py            # CompilationContext value object (compiler + snapshot)
     expression_builder.py # RuntimeContext + OperandBuilder + PredicateBuilder
     clause_builders.py    # SelectClause / From / Join / Window / CTE / SetOp builders
-    builder.py            # QueryBuilder — orchestrates all sub-builders
+    builder.py            # QueryBuilder - orchestrates all sub-builders
     postgres.py           # PostgresCompiler  (%(name)s placeholders, ILIKE, DATE_PART specialisation)
     sqlite.py             # SQLiteCompiler    (:name placeholders, LIKE fallback)
   prompt/
@@ -556,4 +556,4 @@ Makefile                  # Development task runner
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).

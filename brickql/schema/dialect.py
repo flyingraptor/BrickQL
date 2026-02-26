@@ -4,7 +4,7 @@ The DialectProfile controls which SQL features are enabled for a given
 request.  It is included in the system prompt so the LLM plans only within
 allowed capabilities.  Enforcement is done by the validator and compiler.
 
-Create a profile through the builder — compose exactly the features you need,
+Create a profile through the builder - compose exactly the features you need,
 in any combination, with no hidden stacking::
 
     from brickql import DialectProfile
@@ -17,7 +17,7 @@ in any combination, with no hidden stacking::
         .build()
     )
 
-    # Window functions — aggregations() is required because aggregate window
+    # Window functions - aggregations() is required because aggregate window
     # functions (SUM/COUNT OVER ...) share names with regular aggregates
     profile = (
         DialectProfile.builder(tables, target="sqlite")
@@ -79,10 +79,10 @@ _BASE_OPERATORS: list[str] = [
     "NOT",
 ]
 
-# Extra operators unlocked by .joins() — ILIKE for case-insensitive matching.
+# Extra operators unlocked by .joins() - ILIKE for case-insensitive matching.
 _JOIN_EXTRA_OPERATORS: list[str] = ["ILIKE"]
 
-# Operator unlocked by .subqueries() — EXISTS for subquery predicates.
+# Operator unlocked by .subqueries() - EXISTS for subquery predicates.
 _SUBQUERY_EXTRA_OPERATORS: list[str] = ["EXISTS"]
 
 
@@ -117,7 +117,7 @@ class AllowedFeatures(BaseModel):
 class DialectProfile(BaseModel):
     """Combines the backend target with the feature allowlist.
 
-    Always created via :meth:`builder` — never instantiated directly in
+    Always created via :meth:`builder` - never instantiated directly in
     application code.
 
     Attributes:
@@ -140,7 +140,7 @@ class DialectProfile(BaseModel):
         """Return a :class:`DialectProfileBuilder` to compose SQL features.
 
         The base profile allows single-table ``SELECT / WHERE / LIMIT``.
-        Chain feature methods to unlock additional capabilities — each method
+        Chain feature methods to unlock additional capabilities - each method
         is independent and adds exactly one feature group::
 
             profile = (
@@ -165,10 +165,10 @@ class DialectProfileBuilder:
     """Fluent builder for :class:`DialectProfile`.
 
     Always obtained via :meth:`DialectProfile.builder`.  Each method enables
-    one independent feature group — they can be called in any order and
+    one independent feature group - they can be called in any order and
     combined freely.
 
-    Example — joins with aggregations, but no CTEs or window functions::
+    Example - joins with aggregations, but no CTEs or window functions::
 
         profile = (
             DialectProfile.builder(tables, target="postgres")
@@ -177,7 +177,7 @@ class DialectProfileBuilder:
             .build()
         )
 
-    Example — window functions without join support::
+    Example - window functions without join support::
 
         profile = (
             DialectProfile.builder(tables, target="sqlite")
@@ -329,7 +329,7 @@ class DialectProfileBuilder:
         if self._allow_window_functions and not has_aggregations:
             raise ProfileConfigError(
                 "window_functions() requires aggregations(). "
-                "Aggregate window functions — SUM/COUNT/AVG/MIN/MAX OVER (...) — "
+                "Aggregate window functions - SUM/COUNT/AVG/MIN/MAX OVER (...) - "
                 "use the same function names as regular aggregations. "
                 "Without .aggregations() they are not in the allowlist and "
                 "every aggregate window query will be rejected. "

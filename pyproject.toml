@@ -33,7 +33,7 @@ dependencies = [
 postgres = [
     "psycopg[binary]>=3.3",
 ]
-# SQLAlchemy engine reflector — used by schema_from_sqlalchemy().
+# SQLAlchemy engine reflector - used by schema_from_sqlalchemy().
 # pip install "brickql[sqlalchemy]"
 sqlalchemy = [
     "sqlalchemy>=2.0",
@@ -108,7 +108,7 @@ ignore = [
     "TC002",
     "TC003",
     # Em-dashes and similar typographic characters are intentional in
-    # docstrings and comments — they are not visually ambiguous here.
+    # docstrings and comments - they are not visually ambiguous here.
     "RUF002",
     "RUF003",
     # __all__ is organised by category (schema / compile / policy / …) which

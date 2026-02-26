@@ -120,7 +120,7 @@ class SchemaSnapshot(BaseModel):
         """Returns column names for ``table_name``, or ``[]`` if not found.
 
         Prefer this over ``get_table(name).column_names`` to satisfy the
-        Law of Demeter — callers do not need to handle ``None`` themselves.
+        Law of Demeter - callers do not need to handle ``None`` themselves.
 
         Args:
             table_name: The table to look up.

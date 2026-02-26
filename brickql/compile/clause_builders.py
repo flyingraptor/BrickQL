@@ -3,19 +3,19 @@
 Each class handles exactly one SQL clause.  ``CteBuilder``,
 ``SetOpBuilder``, and ``FromClauseBuilder`` receive a *shared build
 function* (``Callable[[QueryPlan], str]``) rather than a subquery factory.
-This means every nested plan — CTEs, SET_OP branches, derived tables, and
-correlated subqueries — is compiled using the **same** :class:`RuntimeContext`
+This means every nested plan - CTEs, SET_OP branches, derived tables, and
+correlated subqueries - is compiled using the **same** :class:`RuntimeContext`
 as the outer query, so literal parameter names are globally unique and
 never collide.
 
 Classes
 -------
-SelectClauseBuilder   — ``SELECT [DISTINCT] <items>``
-FromClauseBuilder     — ``FROM <table | subquery>``
-JoinClauseBuilder     — ``JOIN … ON …``
-WindowSpecBuilder     — ``OVER (PARTITION BY … ORDER BY … FRAME)``
-CteBuilder            — ``WITH [RECURSIVE] <ctes>``
-SetOpBuilder          — ``UNION / INTERSECT / EXCEPT …``
+SelectClauseBuilder   - ``SELECT [DISTINCT] <items>``
+FromClauseBuilder     - ``FROM <table | subquery>``
+JoinClauseBuilder     - ``JOIN … ON …``
+WindowSpecBuilder     - ``OVER (PARTITION BY … ORDER BY … FRAME)``
+CteBuilder            - ``WITH [RECURSIVE] <ctes>``
+SetOpBuilder          - ``UNION / INTERSECT / EXCEPT …``
 """
 
 from __future__ import annotations
@@ -153,7 +153,7 @@ class CteBuilder:
     """Builds the ``WITH [RECURSIVE] <name> AS (…)`` block.
 
     CTE bodies are compiled using ``build_fn`` so they share the outer
-    ``RuntimeContext`` — param names stay globally unique.
+    ``RuntimeContext`` - param names stay globally unique.
     """
 
     def __init__(
@@ -179,7 +179,7 @@ class SetOpBuilder:
     """Builds a ``UNION / INTERSECT / EXCEPT <right_query>`` fragment.
 
     The right-hand query is compiled using ``build_fn`` so it shares the
-    outer ``RuntimeContext`` — param names stay globally unique across both
+    outer ``RuntimeContext`` - param names stay globally unique across both
     branches of the set operation.
     """
 

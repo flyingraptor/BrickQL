@@ -150,7 +150,7 @@ def test_row_number_over_partition_by():
 
 
 # ---------------------------------------------------------------------------
-# ColumnReference.parse — bare-column bug regression
+# ColumnReference.parse - bare-column bug regression
 # ---------------------------------------------------------------------------
 
 
@@ -172,7 +172,7 @@ class TestColumnReferenceParse:
 
 
 # ---------------------------------------------------------------------------
-# build_func_call hook — default behaviour and DATE_PART specialisation
+# build_func_call hook - default behaviour and DATE_PART specialisation
 # ---------------------------------------------------------------------------
 
 

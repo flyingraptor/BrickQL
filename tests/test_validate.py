@@ -500,7 +500,7 @@ def test_deeply_nested_and_or():
 
 
 # ---------------------------------------------------------------------------
-# scalar_functions — DialectProfileBuilder.scalar_functions()
+# scalar_functions - DialectProfileBuilder.scalar_functions()
 # ---------------------------------------------------------------------------
 
 
@@ -568,7 +568,7 @@ class TestScalarFunctions:
 
 
 # ---------------------------------------------------------------------------
-# OperandValidator — ValueOperand/ParamOperand as function args regression
+# OperandValidator - ValueOperand/ParamOperand as function args regression
 # ---------------------------------------------------------------------------
 
 
