@@ -61,6 +61,12 @@ pip install brickql
 
 # With PostgreSQL driver (psycopg v3)
 pip install "brickql[postgres]"
+
+# With MySQL driver (PyMySQL)
+pip install "brickql[mysql]"
+
+# With SQLAlchemy schema reflector
+pip install "brickql[sqlalchemy]"
 ```
 
 Requires Python ≥ 3.10.
@@ -502,7 +508,7 @@ make test-integration-sqlite
 # PostgreSQL integration tests only (starts and stops Docker automatically)
 make test-integration-postgres
 
-# All tests - unit + SQLite + PostgreSQL (requires Docker)
+# All tests - unit + SQLite + PostgreSQL + MySQL (requires Docker)
 make test
 ```
 
@@ -520,6 +526,7 @@ brickql/
     dialect.py            # DialectProfile + DialectProfileBuilder (fluent API)
     column_reference.py   # ColumnReference - parse + validate table.column strings
     context.py            # ValidationContext value object (snapshot + dialect)
+    converters.py         # schema_from_sqlalchemy() - reflect a live DB into SchemaSnapshot
   validate/
     validator.py          # PlanValidator - orchestrates all sub-validators
     dialect_validator.py  # Feature-flag checks (CTE, subquery, join depth, window)
@@ -537,17 +544,17 @@ brickql/
     builder.py            # QueryBuilder - orchestrates all sub-builders
     postgres.py           # PostgresCompiler  (%(name)s placeholders, ILIKE, DATE_PART specialisation)
     sqlite.py             # SQLiteCompiler    (:name placeholders, LIKE fallback)
+    mysql.py              # MySQLCompiler     (%(name)s placeholders, backtick identifiers, EXTRACT)
   prompt/
     builder.py            # PromptBuilder + PromptComponents
   errors.py               # Exception hierarchy (brickQLError and subclasses)
 docs/
   how-it-works.mmd        # Simple end-to-end flow (Mermaid)
-  how-it-works.png        # Rendered architecture diagram (used in README)
   how-it-works.excalidraw # Visual flow diagram (Excalidraw)
 tests/
-  fixtures/               # schema.json, ddl_sqlite.sql, ddl_postgres.sql
-  integration/            # SQLite (in-memory) and PostgreSQL (Docker) integration tests
-docker-compose.yml        # PostgreSQL service for integration tests
+  fixtures/               # schema.json, ddl_sqlite.sql, ddl_postgres.sql, ddl_mysql.sql
+  integration/            # SQLite (in-memory), PostgreSQL, and MySQL (Docker) integration tests
+docker-compose.yml        # PostgreSQL and MySQL services for integration tests
 pyproject.toml            # Package metadata, dependencies, ruff, mypy config
 Makefile                  # Development task runner
 ```
