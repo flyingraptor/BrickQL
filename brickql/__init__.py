@@ -36,6 +36,7 @@ import json
 
 from brickql.compile.base import CompiledSQL
 from brickql.compile.builder import QueryBuilder
+from brickql.compile.mysql import MySQLCompiler
 from brickql.compile.postgres import PostgresCompiler
 from brickql.compile.registry import CompilerFactory
 from brickql.compile.sqlite import SQLiteCompiler
@@ -80,6 +81,7 @@ from brickql.validate.validator import PlanValidator
 
 CompilerFactory.register_class("postgres", PostgresCompiler)
 CompilerFactory.register_class("sqlite", SQLiteCompiler)
+CompilerFactory.register_class("mysql", MySQLCompiler)
 
 __all__ = [
     # Core pipeline
@@ -112,6 +114,7 @@ __all__ = [
     # Compilation
     "CompiledSQL",
     "CompilerFactory",
+    "MySQLCompiler",
     "PostgresCompiler",
     "SQLiteCompiler",
     "QueryBuilder",

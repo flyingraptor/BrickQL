@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brickql"
-version = "0.1.4"
+version = "0.1.5"
 description = "Policy-driven, SQL-standard-aligned query orchestration framework for LLMs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -32,6 +32,11 @@ dependencies = [
 # pip install "brickql[postgres]" to add the optional Postgres driver.
 postgres = [
     "psycopg[binary]>=3.3",
+]
+# PyMySQL driver for the MySQL dialect integration tests.
+# pip install "brickql[mysql]"
+mysql = [
+    "pymysql>=1.1",
 ]
 # SQLAlchemy engine reflector - used by schema_from_sqlalchemy().
 # pip install "brickql[sqlalchemy]"
@@ -74,6 +79,7 @@ testpaths = ["tests"]
 markers = [
     "integration: marks tests as integration tests (require a live database)",
     "postgres: marks tests requiring a PostgreSQL instance (via Docker Compose)",
+    "mysql: marks tests requiring a MySQL instance",
 ]
 
 # ---------------------------------------------------------------------------
@@ -133,9 +139,10 @@ ignore = [
 # typing.Any is intentional in the source for JSON/predicate structures where
 # the shape is validated structurally rather than via static types.
 "brickql/**/*.py" = ["ANN401"]
-# SQL fixture INSERT strings in the Postgres integration tests legitimately
+# SQL fixture INSERT strings in the Postgres/MySQL integration tests legitimately
 # exceed 100 chars; splitting them would harm readability.
 "tests/integration/test_postgres.py" = ["E501"]
+"tests/integration/test_mysql.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["brickql"]

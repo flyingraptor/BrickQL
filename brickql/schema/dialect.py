@@ -53,7 +53,7 @@ from brickql.schema.expressions import (
 )
 
 #: Supported compiler targets.
-DialectTarget = Literal["postgres", "sqlite"]
+DialectTarget = Literal["postgres", "sqlite", "mysql"]
 
 #: All operators the validator knows about.
 SUPPORTED_OPERATORS: frozenset[str] = ALL_PREDICATE_OPS

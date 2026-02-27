@@ -17,11 +17,11 @@ def load_schema_snapshot() -> SchemaSnapshot:
     return SchemaSnapshot.model_validate(data)
 
 
-def load_ddl(target: Literal["sqlite", "postgres"] = "sqlite") -> str:
+def load_ddl(target: Literal["sqlite", "postgres", "mysql"] = "sqlite") -> str:
     """Return the sample DDL SQL string for the given backend.
 
     Args:
-        target: ``'sqlite'`` (default) or ``'postgres'``.
+        target: ``'sqlite'`` (default), ``'postgres'``, or ``'mysql'``.
 
     Returns:
         DDL string ready to execute against the target backend.

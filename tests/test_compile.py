@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from brickql.compile.builder import QueryBuilder
+from brickql.compile.mysql import MySQLCompiler
 from brickql.compile.postgres import PostgresCompiler
 from brickql.compile.sqlite import SQLiteCompiler
 from brickql.schema.column_reference import ColumnReference
@@ -27,6 +28,10 @@ def _pg() -> QueryBuilder:
 
 def _sq() -> QueryBuilder:
     return QueryBuilder(SQLiteCompiler(), SNAPSHOT)
+
+
+def _my() -> QueryBuilder:
+    return QueryBuilder(MySQLCompiler(), SNAPSHOT)
 
 
 def test_select_columns_and_aliases():
@@ -92,6 +97,18 @@ def test_ilike_postgres_vs_sqlite():
     assert "ILIKE" in pg_r.sql
     assert "LIKE" in sq_r.sql
     assert "ILIKE" not in sq_r.sql
+
+
+def test_ilike_mysql_maps_to_like():
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
+        FROM=FromClause(table="employees"),
+        WHERE={"ILIKE": [{"col": "employees.last_name"}, {"value": "%smith%"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    my_r = _my().build(plan)
+    assert "LIKE" in my_r.sql
+    assert "ILIKE" not in my_r.sql
 
 
 def test_one_to_many_join():
@@ -306,3 +323,101 @@ class TestBuildFuncCall:
         assert "DATE_PART(%(param_0)s" not in r.sql  # SQLite uses :name style
         assert "::TIMESTAMP" not in r.sql
         assert "DATE_PART" in r.sql
+
+
+# ---------------------------------------------------------------------------
+# MySQL dialect - identifier quoting, parameter style, and DATE_PART→EXTRACT
+# ---------------------------------------------------------------------------
+
+
+class TestMySQLDialect:
+    """Tests specific to MySQLCompiler behaviour."""
+
+    def test_backtick_quoting(self):
+        """MySQL identifiers are quoted with backticks."""
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(expr={"col": "employees.employee_id"}, alias="id"),
+                SelectItem(expr={"col": "employees.first_name"}, alias="fname"),
+            ],
+            FROM=FromClause(table="employees"),
+            LIMIT=LimitClause(value=20),
+        )
+        r = _my().build(plan)
+        assert "`employees`" in r.sql
+        assert "`employee_id`" in r.sql
+        assert '"employees"' not in r.sql
+
+    def test_param_placeholder_is_percent_style(self):
+        """MySQL uses %(name)s placeholders, same as PostgreSQL."""
+        plan = QueryPlan(
+            SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
+            FROM=FromClause(table="employees"),
+            WHERE={"EQ": [{"col": "employees.employee_id"}, {"value": 42}]},
+            LIMIT=LimitClause(value=1),
+        )
+        r = _my().build(plan)
+        assert "%(param_0)s" in r.sql
+        assert r.params["param_0"] == 42
+
+    def test_runtime_param_placeholder(self):
+        """MySQL runtime params use %(name)s style."""
+        plan = QueryPlan(
+            SELECT=[SelectItem(expr={"col": "employees.employee_id"})],
+            FROM=FromClause(table="employees"),
+            WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+            LIMIT=LimitClause(value=10),
+        )
+        r = _my().build(plan)
+        assert "%(TENANT)s" in r.sql
+        assert "TENANT" not in r.params
+
+    def test_date_part_translates_to_extract(self):
+        """MySQL translates DATE_PART(field, col) to EXTRACT(UNIT FROM col)."""
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "year"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="yr",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        r = _my().build(plan)
+        assert "EXTRACT(YEAR FROM" in r.sql
+        assert "DATE_PART" not in r.sql
+        assert "::TIMESTAMP" not in r.sql
+        assert r.params == {}
+
+    def test_date_part_month_extract(self):
+        """DATE_PART with 'month' translates to EXTRACT(MONTH FROM ...)."""
+        plan = QueryPlan(
+            SELECT=[
+                SelectItem(
+                    expr={
+                        "func": "DATE_PART",
+                        "args": [{"value": "month"}, {"col": "employees.hire_date"}],
+                    },
+                    alias="mo",
+                )
+            ],
+            FROM=FromClause(table="employees"),
+        )
+        r = _my().build(plan)
+        assert "EXTRACT(MONTH FROM" in r.sql
+
+    def test_alias_quoted_with_backticks(self):
+        """Column aliases are also quoted with backticks in MySQL."""
+        plan = QueryPlan(
+            SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+            FROM=FromClause(table="employees"),
+            LIMIT=LimitClause(value=5),
+        )
+        r = _my().build(plan)
+        assert '`id`' in r.sql
+
+    def test_dialect_name(self):
+        assert MySQLCompiler().dialect_name == "mysql"

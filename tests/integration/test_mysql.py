@@ -1,0 +1,608 @@
+"""Integration tests: compile → execute against a real MySQL instance.
+
+Uses BRICKQL_MYSQL_DSN (e.g. ``mysql://user:pass@localhost:3306/brickql_test``).
+Skips all tests if the env var is unset or connection fails.
+Mirrors the PostgreSQL integration tests for the same capability levels.
+
+Requires ``pymysql``::
+
+    pip install pymysql
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from urllib.parse import urlparse
+
+import pytest
+
+try:
+    import pymysql
+    import pymysql.cursors
+except ImportError:
+    pymysql = None  # type: ignore[assignment]
+
+import brickql
+from brickql.errors import DisallowedColumnError
+from brickql.policy.engine import PolicyConfig, TablePolicy
+from brickql.schema.dialect import DialectProfile
+from brickql.schema.query_plan import (
+    CTEClause,
+    FromClause,
+    JoinClause,
+    LimitClause,
+    OffsetClause,
+    OrderByItem,
+    QueryPlan,
+    SelectItem,
+    SetOpClause,
+)
+from tests.fixtures import load_ddl, load_schema_snapshot
+
+pytest.importorskip("pymysql", reason="pymysql required for MySQL integration tests")
+
+SNAPSHOT = load_schema_snapshot()
+ALL_TABLES = [
+    "companies",
+    "departments",
+    "employees",
+    "skills",
+    "employee_skills",
+    "projects",
+    "project_assignments",
+    "salary_history",
+]
+TENANT = "tenant_acme"
+OTHER = "other_corp"
+
+_TENANT = TablePolicy(param_bound_columns={"tenant_id": "TENANT"})
+POLICY = PolicyConfig(
+    inject_missing_params=True,
+    default_limit=0,
+    tables={
+        "companies": _TENANT,
+        "departments": _TENANT,
+        "employees": _TENANT,
+        "projects": _TENANT,
+    },
+)
+
+
+def _get_mysql_connection():
+    dsn = os.environ.get("BRICKQL_MYSQL_DSN")
+    if not dsn:
+        pytest.skip("BRICKQL_MYSQL_DSN not set")
+    try:
+        parsed = urlparse(dsn)
+        return pymysql.connect(
+            host=parsed.hostname or "localhost",
+            port=parsed.port or 3306,
+            user=parsed.username,
+            password=parsed.password or "",
+            database=parsed.path.lstrip("/"),
+            charset="utf8mb4",
+            autocommit=False,
+        )
+    except Exception as e:
+        pytest.skip(f"Cannot connect to MySQL: {e}")
+
+
+@pytest.fixture(scope="module")
+def mysql_conn():
+    """Module-scoped MySQL connection with schema and seed data."""
+    conn = _get_mysql_connection()
+    ddl = load_ddl("mysql")
+
+    with conn.cursor() as cur:
+        cur.execute("SET FOREIGN_KEY_CHECKS=0")
+        for statement in ddl.split(";"):
+            stmt = statement.strip()
+            if stmt:
+                cur.execute(stmt)
+        cur.execute("SET FOREIGN_KEY_CHECKS=1")
+
+        cur.executemany(
+            """INSERT IGNORE INTO companies
+               (company_id, tenant_id, name, industry, founded_year, active, metadata, created_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            [
+                (
+                    1,
+                    TENANT,
+                    "Acme Corp",
+                    "Technology",
+                    2010,
+                    1,
+                    json.dumps({"size": "medium"}),
+                    "2025-01-01 00:00:00",
+                ),
+                (2, OTHER, "Beta LLC", "Finance", 2015, 1, None, "2025-01-01 00:00:00"),
+            ],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO departments
+               (department_id, tenant_id, company_id, name, code, budget, headcount)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            [
+                (1, TENANT, 1, "Engineering", "ENG", 500000.0, 3),
+                (2, TENANT, 1, "Human Resources", "HR", 200000.0, 1),
+                (3, TENANT, 1, "Sales", "SALES", None, 1),
+            ],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO employees
+               (employee_id, tenant_id, company_id, department_id, first_name, last_name,
+                middle_name, email, phone, employment_type, salary, hire_date, birth_date,
+                active, remote, manager_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            [
+                (4, TENANT, 1, 3, "Diana", "Prince", "D", "diana@acme.com", "+4567",
+                 "full_time", 120000.0, "2018-06-01", "1988-08-30", 1, 0, None, "Director"),
+                (1, TENANT, 1, 1, "Alice", "Smith", None, "alice@acme.com", "+1234",
+                 "full_time", 95000.0, "2020-03-15", "1990-05-20", 1, 0, 4, "Senior engineer"),
+                (2, TENANT, 1, 1, "Bob", "Jones", "Robert", "bob@acme.com", None,
+                 "part_time", 45000.0, "2021-07-01", None, 1, 1, 4, None),
+                (3, TENANT, 1, 2, "Charlie", "Brown", None, "charlie@acme.com", "+3456",
+                 "contractor", None, "2022-01-10", "1985-11-11", 1, 0, None, ""),
+                (5, TENANT, 1, None, "Eve", "Foster", None, "eve@acme.com", None,
+                 "contractor", None, "2023-09-01", None, 0, 1, None, None),
+                (6, OTHER, 2, None, "Frank", "Miller", None, "frank@beta.com", None,
+                 "full_time", 80000.0, "2019-04-15", None, 1, 0, None, None),
+            ],
+        )
+        cur.executemany(
+            "INSERT IGNORE INTO skills (skill_id, name, category) VALUES (%s, %s, %s)",
+            [
+                (1, "Python", "programming"),
+                (2, "JavaScript", "programming"),
+                (3, "SQL", "programming"),
+                (4, "Leadership", "management"),
+                (5, "Communication", "soft_skill"),
+            ],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO employee_skills (employee_id, skill_id, proficiency)
+               VALUES (%s, %s, %s)""",
+            [(1, 1, 5), (1, 3, 4), (2, 2, 3), (2, 3, 2), (3, 4, 4), (4, 4, 5), (4, 5, 4)],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO projects
+               (project_id, tenant_id, company_id, name, status, budget, start_date, end_date)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            [
+                (1, TENANT, 1, "Alpha", "active", 100000.0, "2025-01-01", None),
+                (2, TENANT, 1, "Beta", "planning", None, None, None),
+                (3, OTHER, 2, "Gamma", "completed", 50000.0, "2024-01-01", "2024-12-31"),
+            ],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO project_assignments
+               (project_id, employee_id, role, hours_per_week)
+               VALUES (%s, %s, %s, %s)""",
+            [(1, 1, "tech_lead", 40.0), (1, 2, "developer", 20.0), (2, 4, "project_manager", None)],
+        )
+        cur.executemany(
+            """INSERT IGNORE INTO salary_history
+               (employee_id, salary, effective_date, reason)
+               VALUES (%s, %s, %s, %s)""",
+            [
+                (1, 85000.0, "2020-03-15", "initial"),
+                (2, 95000.0, "2022-01-01", "raise"),
+                (3, 45000.0, "2021-07-01", "initial"),
+                (4, 110000.0, "2018-06-01", "initial"),
+                (4, 120000.0, "2021-01-01", "raise"),
+            ],
+        )
+    conn.commit()
+    yield conn
+    conn.close()
+
+
+def _build_dialect(level: int) -> DialectProfile:
+    b = DialectProfile.builder(ALL_TABLES, "mysql")
+    if level >= 2:
+        b = b.joins()
+    if level >= 3:
+        b = b.aggregations()
+    if level >= 4:
+        b = b.subqueries()
+    if level >= 5:
+        b = b.ctes()
+    if level >= 6:
+        b = b.set_operations()
+    if level >= 7:
+        b = b.window_functions()
+    return b.build()
+
+
+def _run(conn, plan: QueryPlan, level: int, runtime: dict | None = None) -> list:
+    plan_json = plan.model_dump_json(exclude_none=True)
+    dialect = _build_dialect(level)
+    compiled = brickql.validate_and_compile(plan_json, SNAPSHOT, dialect, POLICY)
+    effective_runtime = {"TENANT": TENANT}
+    if runtime:
+        effective_runtime.update(runtime)
+    params = compiled.merge_runtime_params(effective_runtime)
+    with conn.cursor() as cur:
+        cur.execute(compiled.sql, params)
+        columns = [d[0] for d in cur.description]
+        return [dict(zip(columns, row)) for row in cur.fetchall()]
+
+
+def _run_with_policy(
+    conn,
+    plan: QueryPlan,
+    level: int,
+    policy: PolicyConfig,
+    runtime: dict | None = None,
+) -> list:
+    plan_json = plan.model_dump_json(exclude_none=True)
+    dialect = _build_dialect(level)
+    compiled = brickql.validate_and_compile(plan_json, SNAPSHOT, dialect, policy)
+    params = compiled.merge_runtime_params(runtime or {})
+    with conn.cursor() as cur:
+        cur.execute(compiled.sql, params)
+        columns = [d[0] for d in cur.description]
+        return [dict(zip(columns, row)) for row in cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 – basic filters
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_tenant_isolation(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=100),
+    )
+    rows = _run(mysql_conn, plan, 1, {"TENANT": TENANT})
+    assert len(rows) == 5
+    rows_other = _run(mysql_conn, plan, 1, {"TENANT": OTHER})
+    assert len(rows_other) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_integer_filter(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={"GT": [{"col": "employees.employee_id"}, {"value": 3}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 1)
+    assert all(r["id"] > 3 for r in rows)
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_is_null_nullable_column(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={
+            "AND": [
+                {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                {"IS_NULL": {"col": "employees.middle_name"}},
+            ]
+        },
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 1, {"TENANT": TENANT})
+    ids = [r["id"] for r in rows]
+    assert 2 not in ids  # Bob has middle_name "Robert"
+    assert 4 not in ids  # Diana has middle_name "D"
+    assert 1 in ids
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_empty_string_notes(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.notes"}, {"value": ""}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 1)
+    ids = [r["id"] for r in rows]
+    assert 3 in ids  # Charlie notes = ""
+    assert 1 not in ids
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_enum_like_in_list(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={
+            "AND": [
+                {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                {
+                    "IN": [
+                        {"col": "employees.employment_type"},
+                        {"value": "full_time"},
+                        {"value": "part_time"},
+                    ]
+                },
+            ]
+        },
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 1, {"TENANT": TENANT})
+    ids = [r["id"] for r in rows]
+    assert 1 in ids and 4 in ids and 2 in ids and 3 not in ids
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p1_like_case_insensitive(mysql_conn):
+    """ILIKE maps to LIKE in MySQL; MySQL LIKE is case-insensitive for VARCHAR by default."""
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={"ILIKE": [{"col": "employees.last_name"}, {"value": "%smith%"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 1)
+    ids = [r["id"] for r in rows]
+    assert 1 in ids  # Alice Smith
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 – JOINs
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p2_one_to_many_join(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.employee_id"}, alias="id"),
+            SelectItem(expr={"col": "departments.name"}, alias="dept"),
+        ],
+        FROM=FromClause(table="employees"),
+        JOIN=[JoinClause(rel="departments__employees", type="LEFT")],
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        ORDER_BY=[OrderByItem(expr={"col": "employees.employee_id"}, direction="ASC")],
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 2, {"TENANT": TENANT})
+    assert len(rows) == 4
+    dept_names = {r["dept"] for r in rows if r["dept"] is not None}
+    assert "Engineering" in dept_names
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p2_self_referential_manager_join(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.employee_id"}, alias="id"),
+            SelectItem(expr={"col": "employees.manager_id"}, alias="mgr_id"),
+        ],
+        FROM=FromClause(table="employees"),
+        JOIN=[JoinClause(rel="employees__manager", type="INNER", alias="mgr")],
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 2, {"TENANT": TENANT})
+    ids = [r["id"] for r in rows]
+    assert 1 in ids and 2 in ids and 4 not in ids
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p2_order_by_and_offset(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        ORDER_BY=[OrderByItem(expr={"col": "employees.employee_id"}, direction="ASC")],
+        LIMIT=LimitClause(value=2),
+        OFFSET=OffsetClause(value=1),
+    )
+    rows = _run(mysql_conn, plan, 2, {"TENANT": TENANT})
+    assert len(rows) == 2 and rows[0]["id"] == 2 and rows[1]["id"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 – aggregations
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p3_count_by_employment_type(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.employment_type"}, alias="etype"),
+            SelectItem(
+                expr={"func": "COUNT", "args": [{"col": "employees.employee_id"}]}, alias="cnt"
+            ),
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        GROUP_BY=[{"col": "employees.employment_type"}],
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 3, {"TENANT": TENANT})
+    totals = {r["etype"]: r["cnt"] for r in rows}
+    assert (
+        totals.get("full_time", 0) == 2
+        and totals.get("part_time", 0) == 1
+        and totals.get("contractor", 0) == 2
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p3_sum_salary_total(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"func": "SUM", "args": [{"col": "employees.salary"}]}, alias="total")
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=1),
+    )
+    rows = _run(mysql_conn, plan, 3, {"TENANT": TENANT})
+    assert float(rows[0]["total"]) == pytest.approx(95000 + 45000 + 120000)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 – CTE
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p5_cte_active_full_time(mysql_conn):
+    cte_body = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={
+            "AND": [
+                {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                {"EQ": [{"col": "employees.employment_type"}, {"value": "full_time"}]},
+                {"EQ": [{"col": "employees.active"}, {"value": 1}]},
+            ]
+        },
+        LIMIT=LimitClause(value=200),
+    )
+    plan = QueryPlan(
+        CTE=[CTEClause(name="ft_active", query=cte_body)],
+        SELECT=[SelectItem(expr={"col": "ft_active.id"})],
+        FROM=FromClause(table="ft_active"),
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run(mysql_conn, plan, 5, {"TENANT": TENANT})
+    assert len(rows) == 2  # Alice + Diana
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 – set operations
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_p6_union_all_active_inactive(mysql_conn):
+    inactive_plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={
+            "AND": [
+                {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                {"EQ": [{"col": "employees.active"}, {"value": 0}]},
+            ]
+        },
+        LIMIT=LimitClause(value=100),
+    )
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.employee_id"}, alias="id")],
+        FROM=FromClause(table="employees"),
+        WHERE={
+            "AND": [
+                {"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+                {"EQ": [{"col": "employees.active"}, {"value": 1}]},
+            ]
+        },
+        LIMIT=LimitClause(value=100),
+        SET_OP=SetOpClause(op="UNION_ALL", query=inactive_plan),
+    )
+    rows = _run(mysql_conn, plan, 6, {"TENANT": TENANT})
+    assert len(rows) == 5
+
+
+# ---------------------------------------------------------------------------
+# Policy - allowed_columns (column allowlist / RBAC pattern)
+# ---------------------------------------------------------------------------
+
+_ANALYST_POLICY = PolicyConfig(
+    inject_missing_params=True,
+    default_limit=0,
+    tables={
+        "employees": TablePolicy(
+            param_bound_columns={"tenant_id": "TENANT"},
+            allowed_columns=[
+                "employee_id",
+                "tenant_id",
+                "first_name",
+                "last_name",
+                "department_id",
+                "hire_date",
+                "active",
+            ],
+        ),
+    },
+)
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_policy_allowed_columns_permits_allowed_query(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.first_name"}, alias="first"),
+            SelectItem(expr={"col": "employees.last_name"}, alias="last"),
+            SelectItem(expr={"col": "employees.hire_date"}, alias="hired"),
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    rows = _run_with_policy(mysql_conn, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    assert len(rows) == 5
+    assert all("hired" in r for r in rows)
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_policy_allowed_columns_blocks_unlisted_column(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[
+            SelectItem(expr={"col": "employees.first_name"}),
+            SelectItem(expr={"col": "employees.salary"}),  # not in analyst allowlist
+        ],
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _run_with_policy(mysql_conn, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    err = exc_info.value
+    assert err.details["column"] == "salary"
+    assert err.details["table"] == "employees"
+    assert "salary" not in err.details["allowed_columns"]
+
+
+@pytest.mark.integration
+@pytest.mark.mysql
+def test_policy_allowed_columns_error_details_list_allowlist(mysql_conn):
+    plan = QueryPlan(
+        SELECT=[SelectItem(expr={"col": "employees.notes"})],  # not in allowlist
+        FROM=FromClause(table="employees"),
+        WHERE={"EQ": [{"col": "employees.tenant_id"}, {"param": "TENANT"}]},
+        LIMIT=LimitClause(value=10),
+    )
+    with pytest.raises(DisallowedColumnError) as exc_info:
+        _run_with_policy(mysql_conn, plan, 1, _ANALYST_POLICY, {"TENANT": TENANT})
+    allowed = set(exc_info.value.details["allowed_columns"])
+    assert allowed == {
+        "employee_id",
+        "tenant_id",
+        "first_name",
+        "last_name",
+        "department_id",
+        "hire_date",
+        "active",
+    }
