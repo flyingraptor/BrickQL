@@ -16,15 +16,14 @@ brickQL separates concerns cleanly: the LLM outputs a structured **QueryPlan (JS
 
 Text-to-SQL is a well-established approach: feed the LLM a natural-language question and a schema, and let it write the SQL directly. It works well for simple queries and controlled environments, but breaks down as soon as real-world constraints appear:
 
-| Challenge | Why it hurts |
-|---|---|
-| **Hallucinated syntax** | LLMs invent column names, functions, or dialect-specific constructs that don't exist in your database, causing runtime errors that are hard to debug at scale. |
-| **No policy enforcement** | There is no layer between the generated SQL and the database. Row-level filters, param-bound column constraints, and column allowlists must be bolted on externally, and can silently fail. |
-| **Prompt-injection surface** | The LLM sees and reasons over raw SQL strings. Malicious content in user input or database values can redirect the query, exfiltrate data, or trigger destructive operations. |
-| **Non-deterministic repairs** | When a query fails, the LLM must re-generate free-form SQL, each attempt is a new coin flip with the same attack surface. |
-| **Dialect fragility** | SQL is not a single language. A query that works on PostgreSQL may silently mis-behave on SQLite or MySQL; the LLM has no mechanism to stay within a safe dialect subset. |
-
-brickQL addresses each of these by moving the LLM out of the SQL-generation path entirely. The LLM reasons in a structured, schema-aware **QueryPlan (JSON)**; brickQL owns the compilation step, enforces every policy rule, and emits parameterized SQL that never flows back to the model.
+| Challenge | Why it hurts | How brickQL fixes it |
+|---|---|---|
+| **Hallucinated syntax** | LLMs invent column names, functions, or dialect-specific constructs that don't exist in your database, causing runtime errors that are hard to debug at scale. | The LLM outputs a typed, structured `QueryPlan` JSON. Free-form SQL is structurally impossible. brickQL compiles it to parameterized SQL with no string interpolation. |
+| **No policy enforcement** | There is no layer between the generated SQL and the database. Row-level filters, param-bound column constraints, and column allowlists must be bolted on externally, and can silently fail. | Per-table param-bound column enforcement, column allowlists (RBAC), and denied columns. Any column can be bound to a runtime parameter; the LLM cannot bypass the predicate. |
+| **Prompt-injection surface** | The LLM sees and reasons over raw SQL strings. Malicious content in user input or database values can redirect the query, exfiltrate data, or trigger destructive operations. | Implements Plan-Then-Execute: the LLM commits to a structured `QueryPlan` before any data is returned. Database contents can never inject new instructions. |
+| **Non-deterministic repairs** | When a query fails, the LLM must re-generate free-form SQL, each attempt is a new coin flip with the same attack surface. | All errors are machine-readable: a typed exception hierarchy with `code` and `details` fields. `to_error_response()` feeds structured error context back to the LLM for targeted repair. |
+| **Dialect fragility** | SQL is not a single language. A query that works on PostgreSQL may silently mis-behave on SQLite or MySQL; the LLM has no mechanism to stay within a safe dialect subset. | Opt in to only the SQL features you need via `DialectProfile`. A fluent builder with dependency enforcement at `build()` time. |
+| **Target DB awareness** | The LLM must know which database it's targeting and produce the correct syntax — date functions, quoting, pagination, and type casting all differ across engines. | Built-in compilers for SQLite, PostgreSQL, and MySQL. Add any other target by registering a `SQLCompiler` subclass with one decorator, no core changes. |
 
 ---
 
