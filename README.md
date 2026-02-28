@@ -49,7 +49,7 @@ Among its ten case studies, §4.2 examines SQL agents under a threat model where
 | **Least-privilege access control** - restrict tables, columns, and operations to exactly what the role needs | `DialectProfile` allowlists tables and SQL features; `PolicyConfig` / `TablePolicy` enforce per-table column allowlists, deny lists, and param-bound columns |
 | **Parameterized execution** - prevent SQL injection from literal values in the plan | All `{"value": …}` operands are compiled to named placeholders; no string interpolation occurs anywhere in the compilation path |
 
-The OR-bypass hardening in `PolicyEngine._where_satisfies_param` (which ensures a param-bound column cannot be satisfied by placing the required predicate inside an `OR` branch) and the `build_repair_prompt` sanitization (which re-serializes the previous plan through `json.loads` / `json.dumps` before feeding it back to the LLM) are direct responses to security risks identified through the paper's threat model.
+The OR-bypass hardening in `PolicyEngine._where_satisfies_param` (which ensures a param-bound column cannot be satisfied by placing the required predicate inside an `OR` branch) and `to_error_response()` (which serializes error context to a self-contained JSON string before it is embedded in an LLM repair prompt, preventing plan content from injecting new instructions) are direct responses to security risks identified through the paper's threat model.
 
 ---
 
@@ -351,18 +351,22 @@ response = llm.chat(system=components.system_prompt, user=components.user_prompt
 
 ## Error handling
 
-All errors are subclasses of `brickQLError` and carry a machine-readable `code` and `details` dict - designed for LLM repair loops.
+All errors are subclasses of `brickQLError`. `ParseError` and `PolicyViolationError` both expose `to_error_response()` which returns a ready-to-embed JSON string for LLM repair loops.
 
 ```python
-from brickql import ParseError, ValidationError, CompilationError
+from brickql import ParseError, PolicyViolationError, ValidationError, CompilationError
 
 try:
     compiled = brickql.validate_and_compile(plan_json, snapshot, dialect, policy)
 except ParseError as e:
-    # Malformed JSON or invalid QueryPlan structure
+    # Malformed JSON - e.to_error_response() returns a JSON string for LLM repair
+    pass
+except PolicyViolationError as e:
+    # Policy rule violated (denied column, missing param, disallowed table)
+    # e.to_error_response() returns a JSON string with code + details for LLM repair
     pass
 except ValidationError as e:
-    # Schema or dialect rule violated - pass e.to_error_response() back to LLM
+    # Schema or dialect rule violated
     pass
 except CompilationError as e:
     raise
