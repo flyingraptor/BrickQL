@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8] — 2026-02-28
+
+### Fixed
+- README images now render correctly on PyPI (switched to absolute GitHub raw URLs)
+
+---
+
 ## [0.1.7] — 2026-02-28 — First public release
 
 brickQL is a policy-driven query orchestration layer for LLMs. Instead of letting the model generate free-form SQL, the LLM outputs a structured `QueryPlan` JSON which brickQL validates, enforces policy rules against, and compiles to safe, parameterized SQL.
