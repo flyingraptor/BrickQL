@@ -6,6 +6,7 @@ class for any brickQL-specific failure.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 
@@ -24,6 +25,10 @@ class ParseError(brickQLError):
     def __init__(self, message: str, raw: str | None = None) -> None:
         super().__init__(message)
         self.raw = raw
+
+    def to_error_response(self) -> str:
+        """Returns a JSON string suitable for embedding in an LLM repair prompt."""
+        return json.dumps({"error": "PARSE_ERROR", "message": str(self)}, indent=2)
 
 
 class ValidationError(brickQLError):
@@ -45,16 +50,23 @@ class ValidationError(brickQLError):
         self.code = code
         self.details: dict[str, Any] = details or {}
 
-    def to_error_response(self) -> dict[str, Any]:
-        """Returns a structured error response suitable for LLM repair."""
-        return {
-            "error": self.code,
-            "message": str(self),
-            "details": self.details,
-        }
+    def to_error_response(self) -> str:
+        """Returns a JSON string suitable for embedding in an LLM repair prompt."""
+        return json.dumps({"error": self.code, "message": str(self), "details": self.details}, indent=2)
 
 
-class DisallowedColumnError(ValidationError):
+class PolicyViolationError(ValidationError):
+    """Base class for errors raised when a QueryPlan violates a PolicyConfig rule.
+
+    Catch this to handle all policy violations in one place, for example to
+    feed the structured error payload back to the LLM for automatic repair:
+
+        except PolicyViolationError as e:
+            repair_prompt = e.to_error_response()
+    """
+
+
+class DisallowedColumnError(PolicyViolationError):
     """Raised when the plan references a column not in the policy allowlist."""
 
     def __init__(
@@ -74,7 +86,7 @@ class DisallowedColumnError(ValidationError):
         )
 
 
-class DisallowedTableError(ValidationError):
+class DisallowedTableError(PolicyViolationError):
     """Raised when the plan references a table not in the policy allowlist."""
 
     def __init__(self, table: str, allowed_tables: list[str]) -> None:
@@ -110,7 +122,7 @@ class DialectViolationError(ValidationError):
         )
 
 
-class MissingParamError(ValidationError):
+class MissingParamError(PolicyViolationError):
     """Raised when a policy-bound column is not using the required param."""
 
     def __init__(self, column: str, required_param: str) -> None:
