@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="brickQL" width="420" />
+  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/logo.png" alt="brickQL" width="420" />
 </p>
 
 # Text to brickQL
@@ -30,7 +30,7 @@ Text-to-SQL is a well-established approach: feed the LLM a natural-language ques
 ## How it works
 
 <p align="center">
-  <img src="docs/how-it-works.png" alt="brickQL flow diagram" width="500" />
+  <img src="https://raw.githubusercontent.com/flyingraptor/BrickQL/main/docs/how-it-works.png" alt="brickQL flow diagram" width="500" />
 </p>
 
 ---
